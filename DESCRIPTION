@@ -1,0 +1,32 @@
+Type: Package
+Package: SlakeItEasy
+Title: Image-Based Estimation of Soil Aggregate Stability
+Version: 0.1.0
+Author: Nate Looker
+Maintainer: Nate Looker <nlooker@soilhealthinstitute.org>
+Description: Utility functions to determine the projected area of soil
+    during slaking tests, following Fajardo et al. (2016)
+    <doi:10.1016/j.still.2016.05.018>. Functions are designed for output
+    of high-throughput image aquisition schemes (e.g., multiple
+    replicates, multiple samples).
+License: MIT + file LICENSE
+URL: https://soilhealthinstitute.org/,
+    https://github.com/Soil-Health-Institute
+Imports: 
+    dplyr,
+    EBImage,
+    exifr,
+    magrittr,
+    parallel,
+    readxl,
+    rstudioapi,
+    stringr
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: 
+    knitr
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.1
+Roxygen: list(markdown = TRUE)
