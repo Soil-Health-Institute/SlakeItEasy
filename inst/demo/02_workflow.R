@@ -3,7 +3,7 @@ library(dplyr)
 library(SlakeItEasy)
 
 # set paths to images and output directory --------------------------------
-paths <- set_paths(parent_dir_img = 'inst', batch_name = 'demo')
+paths <- set_paths(parent_dir_img = system.file("images/", package="SlakeItEasy"), batch_name = 'demo')
 
 # create directory for output and for problematic images ------------------
 dirs_for_flagged_imgs <- dir_setup(paths$output_dir,  return_paths = T)
