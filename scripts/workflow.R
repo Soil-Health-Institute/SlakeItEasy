@@ -84,6 +84,15 @@ results <- results %>%
          sample_id = sapply(strsplit(replicate_id, '_'), function(x) x[[1]])) %>%
   filter(!replicate_id %in% unusable)
 
+
+# save results to disk ----------------------------------------------------
+
+results %>%
+  write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_results.csv'), row.names = F)
+
+
+# summarize results by sample ---------------------------------------------
+
 results %>%
   write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_results.csv'), row.names = F)
 
