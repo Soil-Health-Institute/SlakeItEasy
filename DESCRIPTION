@@ -12,6 +12,7 @@ Description: Utility functions to determine the projected area of soil
 License: MIT + file LICENSE
 URL: https://soilhealthinstitute.org/,
     https://github.com/Soil-Health-Institute
+biocViews:
 Imports: 
     dplyr,
     EBImage,
