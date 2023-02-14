@@ -94,9 +94,6 @@ results %>%
 # summarize results by sample ---------------------------------------------
 
 results %>%
-  write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_results.csv'), row.names = F)
-
-results %>%
   group_by(sample_id) %>%
   summarise(stab10_mg = mean_geom(stab10), stab10_cv = cv(stab10), nreps = n())
 
