@@ -26,16 +26,18 @@ Attribute \code{source_path} records the argument passed to \code{input_path}.
 }
 \examples{
 # path to example image file
-f <- system.file("images/exp", "exp2.jpg", package="SlakeItEasy")
+f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
 
 # read in image
 img_portrait <- read_to_portrait(f)
 
 # verify that image is in portrait orientation
-display(img_portrait)
+EBImage::display(img_portrait)
+
+# get image dimensions
 dim(img_portrait)
 
-# compare with dimensions of original image without rotation
+# compare with dimensions of original image
 dim(EBImage::readImage(f))
 
 }

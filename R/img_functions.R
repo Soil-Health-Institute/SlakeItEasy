@@ -15,13 +15,13 @@
 #' @return An object of class `Image`.
 #'
 #' @examples # path to example image file
-#' f <- system.file("images/exp", "exp2.jpg", package="SlakeItEasy")
+#' f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
 #'
 #' # read in image
 #' img_portrait <- read_to_portrait(f)
 #'
 #' # verify that image is in portrait orientation
-#' display(img_portrait)
+#' EBImage::display(img_portrait)
 #'
 #' # get image dimensions
 #' dim(img_portrait)
@@ -54,16 +54,41 @@ read_to_portrait <- function(input_path) {
 
 }
 
-#' Title
+#' Crop or Mask an Image
 #'
-#' @param img
-#' @param dim_list
-#' @param mask_only
+#' Produce a rectangular subset of an image, either with the same dimensions as the original image but pixels outside of the subset set to black (mask) or with dimensions aligned to the subset (crop).
 #'
-#' @return
+#' @details `crop image` crops or masks an `Image` object based on a rectangular extent provided as a list.
+#'
+#' The `Image` object returned by `crop image` has attributes `crop_dim` and `source_dim` with the crop/mask extent and original image dimensions, respectively.
+#'
+#' @param img `Image` object
+#' @param dim_list List containing the crop/mask extent as two vectors of length two (minimum and maximum coordinates in the horizontal and in the vertical dimensions)
+#' @param mask_only Logical. If `TRUE`, the output image will retain the dimensions of the input image.
+#'
+#' @return An object of class `Image`.
+#'
+#' @examples # path to example image file
+#' f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
+#'
+#' # read in image
+#' img_in <- read_to_portrait(f)
+#'
+#' # define extent for crop
+#' e <- list(x = c(115, 540), y = c(220, 640))
+#'
+#' # crop image
+#' img_cropped <- crop_image(img_in, e)
+#'
+#' EBImage::display(img_cropped)
+#'
+#' # mask image
+#' img_masked <- crop_image(img_in, e, mask_only = T)
+#'
+#' EBImage::display(img_masked)
+#'
 #' @export
 #'
-#' @examples
 crop_image <- function(img, dim_list, mask_only = F) {
 
   i <- lapply(dim_list, function(v) min(v):max(v))
@@ -73,7 +98,7 @@ crop_image <- function(img, dim_list, mask_only = F) {
   img_crop <- img[i$x, i$y,]
 
   attr(img_crop, 'crop_dim') <- dim_list
-  attr(img_crop, 'dim_source') <- dim(img)
+  attr(img_crop, 'source_dim') <- dim(img)
 
   return(img_crop)
 
@@ -106,113 +131,120 @@ crop_image <- function(img, dim_list, mask_only = F) {
 
 }
 
-# set crop box by clicking on graphics device window
-#' Title
+#' Interactively Determine an Extent for Rectangular Cropping
 #'
-#' @param npts
+#' @param npts Number of points for extent
 #'
-#' @return
+#' @return Two-element list with first element a vector of minimum and maximum horizontal coordinates and second element a vector of minimum and maximum vertical coordinates.
 #' @export
 #'
 #' @examples
+#' # path to example image file
+#' f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
+#'
+#' # read in image
+#' img_portrait <- read_to_portrait(f)
+#'
+#' # plot image
+#' plot(img_portrait)
+#'
+#' # get extent for crop
+#' (ext <- set_crop())
+#'
 set_crop <- function(npts = 2) {
   p <- locator(npts, type = "p", pch = 3, col = "red")
   p_out <- lapply(p, function(x) round(c(min(x), c(max(x)))))
   return(p_out)
 }
 
-#' Title
+#' Classify Soil and Background Pixels in a Color Image
 #'
-#' @param img
+#' Average pixel intensities across red, green, and blue bands, and apply Otsu's binary thresholding algorithm to the pixel intensity histogram.
 #'
-#' @return
+#' @details Pixel intensities are averaged across red, green, and blue bands. The resulting histogram is then partitioned into two classes using Otsu's method for threshold optimization (Otsu 1979). Note that bandwise classification requires 10x computation time and yields results comparable to the average-then-classify approach implemented in {SlakeItEasy}. Because Otsu's method may fail to discern soil from other dark objects within the image, `rgb_to_binary` should be applied after cropping/masking the image.
+#'
+#' @param img Three-band `Image` object
+#'
+#' @return One-band `Image object`, with pixel values of 1 indicating soil and 0 indicating background.
+#'
+#' @references N. Otsu. A threshold selection method from gray-level histograms. IEEE Trans. Sys., Man., Cyber. 9 (1): 62-66, 1979. doi:10.1109/TSMC.1979.4310076.
+#'
 #' @export
 #'
 #' @examples
-interactive_crop <- function(img) {
-
-  dev.new()
-
-  # open_window()
-
-  par(mfrow = c(1,1))
-
-  plot(img)
-
-  text(x = 20, y = 20, label = "Click two opposite corners to crop", adj = c(0,1), col = "red", cex = 2)
-
-  p_out <- set_crop(2)
-
-  img_crop <- crop_image(img, p_out)
-
-  plot(img_crop)
-  Sys.sleep(1)
-
-  dev.off()
-
-  return(img_crop)
-
-}
-
-#' Title
+#' # path to example image file
+#' f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
 #'
-#' @param img
+#' # read in image
+#' img <- read_to_portrait(f)
 #'
-#' @return
-#' @export
+#' # apply circular mask to image
+#' img_masked <- mask_image_circular(img, interactive = F)
 #'
-#' @examples
+#' classified <- rgb_to_binary(img_masked)
+#'
+#' par(mfrow = c(1, 2))
+#' plot(img); plot(classified)
+#'
 rgb_to_binary <- function(img) {
 
-  EBImage::colorMode(img) <- Grayscale
+  # average R, G, and B bands
+  img <- (img[,,1] + img[,,2] + img[,,3])/3
+
+  # change color mode to grayscale (required for EBImage::otsu())
+  EBImage::colorMode(img) <- EBImage::Grayscale
 
   # estimate soil/background thresholds for each band
   threshold <- EBImage::otsu(img)
 
-  img_binary <- EBImage::combine( mapply(function(frame, th) frame <= th, EBImage::getFrames(img), threshold, SIMPLIFY=FALSE) )
+  # apply threshold to image
+  img_binary <- 1 - (img > threshold)
 
-  # average R, G, and B bands
-  img_binary <- (img_binary[,,1] + img_binary[,,2] + img_binary[,,3])/3
+  storage.mode(img_binary) <- 'integer'
 
-  img_binary <- Image(apply(img_binary, 2, function(x) as.numeric(!is.na(x) & x > 0)))
-
-  attr(img_binary, 'otsu_thresholds') <- threshold
+  attr(img_binary, 'otsu_threshold') <- threshold
 
   return(img_binary)
 
 }
 
-# normalized differences between a pair of bands, with a minimum cutoff (mindiff = 0 recommended for dark objects, may not work for light-colored soils)
-
-#' Title
+#' Threshold an Image by Normalized Difference between Two Bands
 #'
-#' @param img
-#' @param b1_idx
-#' @param b2_idx
-#' @param mindiff
+#' Calculate the normalized difference ((x - y) / (x + y)) between two image bands, and segment the image according to a specified value of the normalized difference.
 #'
-#' @return
+#' @details Conservative method of identifying soil within an image. This algorithm is provided to support the masking process when a simple circular mask is insufficient (e.g., non-soil objects are interspersed with soil). `norm_diff` will generally underestimate the total area of soil and is intended to be used in conjunction with [EBImage::erode_and_dilate()].
+#'
+#' @param img `Image` object
+#' @param b1_idx index for first band
+#' @param b2_idx index for second band
+#' @param mindiff threshold minimum value for normalized difference between bands
+#'
+#' @return One-band `Image object`, with pixel values of 1 indicating normalized difference values greater than or equal to `mindiff` and values of 0 indicating normalize difference values less than `mindiff`
 #' @export
 #'
 #' @examples
+#' # Path to example image
+#' f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
+#'
+#' # Read in image
+#' img <- read_to_portrait(f)
+#'
+#' # Apply circular mask to image
+#' masked <- mask_image_circular(img, interactive = F)
+#'
+#' # Threshold with normalized difference
+#' nd <- norm_diff(masked, 2, 3)
+#' plot(nd)
+#'
 norm_diff <- function(img, b1_idx, b2_idx, mindiff = 0){
   out <- (img[,,b1_idx]  - img[,,b2_idx]) / (img[,,b1_idx]  + img[,,b2_idx])
   colorMode(out) <- Grayscale
-  out >= mindiff
+  out <- out >= mindiff
+  storage.mode(out) <- 'integer'
+  return(out)
 }
 
 # erode and then dilate an image with a disc-shaped kernel
-
-#' Title
-#'
-#' @param img
-#' @param erode_size
-#' @param dilate_size
-#'
-#' @return
-#' @export
-#'
-#' @examples
 erode_and_dilate <- function(img, erode_size = 5, dilate_size = erode_size * 7) {
 
   kern <- makeBrush(erode_size, shape='disc')
@@ -222,17 +254,6 @@ erode_and_dilate <- function(img, erode_size = 5, dilate_size = erode_size * 7) 
 }
 
 # get coordinates of bounding box around an object within a matrix OR return summary statistics on bbox geometry
-
-#' Title
-#'
-#' @param obj_id
-#' @param matr
-#' @param return_summary
-#'
-#' @return
-#' @export
-#'
-#' @examples
 matrix_bbox <- function(obj_id, matr, return_summary = F) {
   indices <- which(matr == obj_id, arr.ind = T)
   indices_range <- apply(indices, 2, range)
@@ -263,16 +284,6 @@ matrix_bbox <- function(obj_id, matr, return_summary = F) {
 }
 
 # get bounding boxes of all labeled objects in an image
-#' Title
-#'
-#' @param img
-#' @param return_counts
-#' @param ...
-#'
-#' @return
-#' @export
-#'
-#' @examples
 get_object_dims <- function(img, return_counts = F, ...) {
   matr <- imageData(img)
   counts <- table(matr)
@@ -287,16 +298,6 @@ get_object_dims <- function(img, return_counts = F, ...) {
 }
 
 # drop objects intersecting a bounding box (following https://support.bioconductor.org/p/52148/#52271)
-
-#' Title
-#'
-#' @param img
-#' @param bbox
-#'
-#' @return
-#' @export
-#'
-#' @examples
 drop_edge_objs <- function(img, bbox = NULL) {
 
   objects <- bwlabel(img)
@@ -329,15 +330,6 @@ drop_edge_objs <- function(img, bbox = NULL) {
 
 }
 
-#' Title
-#'
-#' @param img
-#' @param n
-#'
-#' @return
-#' @export
-#'
-#' @examples
 keep_n_objs <- function(img, n = 3) {
 
   storage.mode(img) <- 'integer'
@@ -350,17 +342,6 @@ keep_n_objs <- function(img, n = 3) {
 
 # distance from centroid of largest N objects
 
-#' Title
-#'
-#' @param xcoord
-#' @param ycoord
-#' @param area_var
-#' @param n
-#'
-#' @return
-#' @export
-#'
-#' @examples
 dist_from_n_objs <- function(xcoord, ycoord, area_var, n = 3) {
 
   obj_ids <- which(rank(area_var) %in% (length(area_var) - n +1):length(area_var))
@@ -411,16 +392,6 @@ dist_from_n_objs <- function(xcoord, ycoord, area_var, n = 3) {
 
 # interactively select center for circular crop
 
-#' Title
-#'
-#' @param img
-#' @param h_offset
-#' @param v_offset
-#'
-#' @return
-#' @export
-#'
-#' @examples
 set_center <- function(img, h_offset = 0, v_offset = 0) {
 
   dims <- dim(img)[1:2]
@@ -451,16 +422,6 @@ set_center <- function(img, h_offset = 0, v_offset = 0) {
 
 # create circular mask for crop
 
-#' Title
-#'
-#' @param img
-#' @param d
-#' @param circ_center
-#'
-#' @return
-#' @export
-#'
-#' @examples
 generate_circle <- function(img, d = 0.6, circ_center = NULL) {
 
   # get length and width (ignore 3rd dimension for multiband images)
@@ -492,27 +453,43 @@ generate_circle <- function(img, d = 0.6, circ_center = NULL) {
   dims_long$dist[dims_long$dist > r]  <- 0
 
   # format values as wide matrix and coerce to EBImage::Image class
-  out <- tidyr::spread(dims_long, y , dist) %>% dplyr::select(-x) %>% as.matrix() %>% Image()
+  out <- tidyr::spread(dims_long, y , dist) %>% dplyr::select(-x) %>% as.matrix() %>% EBImage::Image()
 
   return(out)
 
 }
 
-#' Title
+#' Apply a Circular Mask to an Image
 #'
-#' @param img
-#' @param d
-#' @param stepsize_center
-#' @param stepsize_diam
-#' @param interactive
-#' @param h_offset
-#' @param v_offset
+#' Mask pixels outside of a circular area of interest.
 #'
-#' @return
+#' @details For most implementations of the Soil Health Institute's multi-sample aggregate stability standard operating procedure, `mask_image_circular` will be the primary image preparation step prior to pixel classification with [SlakeItEasy::rgb_to_binary()].
+#'
+#' @param img `Image` object
+#' @param d diameter of circular mask as a proportion of image width
+#' @param stepsize_center step size to reposition center of circular corp
+#' @param stepsize_diam step size to adjust diameter of circular crop
+#' @param interactive logical indicating whether the mask should be set interactively
+#' @param h_offset horizontal offset for center of circular crop
+#' @param v_offset vertical offset for center of circular crop
+#'
+#' @return `Image` object
 #' @export
 #'
-#' @examples
-crop_image_circular <- function(img, d = 0.7, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = T, h_offset = 0, v_offset = 0) {
+#' @examples # path to example image file
+#' f <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
+#'
+#' # read in image
+#' img_in <- read_to_portrait(f)
+#'
+#' # mask image
+#'
+#' img_masked <- mask_image_circular(img_in, interactive = F)
+#'
+#' plot(img_masked)
+#'
+#'
+mask_image_circular <- function(img, d = 0.7, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = T, h_offset = 0, v_offset = 0) {
 
   if (interactive) {
     cent <- set_center(img, h_offset = h_offset, v_offset = v_offset)

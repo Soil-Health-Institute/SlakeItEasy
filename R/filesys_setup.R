@@ -1,16 +1,29 @@
-# set paths to directories containing images and directory for output files
-
-#' Title
+#' Paths to Inputs/Outputs
 #'
-#' @param parent_dir_img
-#' @param parent_dir_out
-#' @param batch_name
+#' Interactively set paths to directories containing images and directory for
+#' output files.
 #'
-#' @return
+#' @details `set_paths` uses [rstudioapi::selectDirectory()] to facilitate
+#'   interactive selection of input and output directories. If `parent_dir_img`
+#'   is unspecified, the location of the current active project will be used as
+#'   the initial directory for selection of directory containing images.
+#'
+#' @param parent_dir_img character string containing relative or absolute path to directory containing subdirectory with images to process
+#' @param parent_dir_out character string containing relative or absolute path to directory where a new subdirectory will be created for output
+#' @param batch_name character string containing name for batch of images to be processed and for associated output directory
+#'
+#' @return A three-element list containing the path to the input image directory, the batch name, and the path to the output directory, as character strings. Relative paths will be returned if relative paths were provided as arguments to `parent_dir_img` and `parent_dir_out`.
+#'
 #' @export
 #'
 #' @examples
-set_paths <- function(parent_dir_img = '~/Soil Health Institute/Data Repository - Documents/Data Delivery/AmAgLab', parent_dir_out = NULL, batch_name = NULL) {
+#' # Start selection in directory of active project
+#' paths <- set_paths()
+#'
+#' # Start selection in directory other than active project
+#' # paths2 <- set_paths(parent_dir_img = '~/Documents/MySlakesData/')
+
+set_paths <- function(parent_dir_img = NULL, parent_dir_out = NULL, batch_name = NULL) {
 
   # if parent_dir_img is unspecified, use location of project as initial directory for selection of directory containing images
   if (is.null(parent_dir_img) | !dir.exists(format(parent_dir_img))) {
@@ -43,44 +56,52 @@ set_paths <- function(parent_dir_img = '~/Soil Health Institute/Data Repository 
 
 }
 
-# create non-existing directory and suppress warning if directory already exists
-#' Title
+#' Silently Create a Directory
 #'
-#' @param direc
-#' @param ...
+#' Create a directory; suppress warning if directory already exists.
 #'
-#' @return
+#' @param direc character string containing path name
+#' @param ... additional arguments passed to `dir.create`
+#'
 #' @export
 #'
-#' @examples
 dir_create_silent <- function(direc, ...) {
 
   suppressWarnings(dir.create(direc, ...))
 
-  if(!dir.exists(direc)) {stop(paste0('Could not create   directory ', direc))}
+  if(!dir.exists(direc)) {stop(paste0('Could not create directory ', direc))}
 
 }
 
-# create directories for output images and log files
-#' Title
+#' Create Directory for Output
 #'
-#' @param outdir_root
-#' @param outdir_name
-#' @param subdirs
-#' @param ...
-#' @param return_paths
+#' Create a directory for output of the analysis of a batch of images
 #'
-#' @return
+#' @details `dir_setup` creates a batch-level directory for processed images and metadata. Subdirectories not created by [SlakeItEasy::process_petri()] can be created with `dir_setup` by providing a vector of subdirectory names (as relative paths) to the `subdirs` argument. By default, subdirectories are created for later manual sorting of images that need reprocessing and images that are unusable for analysis.
+#'
+#' @param output_dir character string with absolute path to output directory
+#' @param subdirs character vector with names of subdirectories to create
+#' @param return_paths logical. If TRUE, a vector containing absolute paths to created subdirectories is returned.
+#'
+#' @return Character vector with absolute paths to created subdirectories if `return_paths` is TRUE.
 #' @export
 #'
 #' @examples
-dir_setup <- function(outdir_root, outdir_name = 'slakes_processed', subdirs = c('manually_processed', 'auto_processed', 'to_reprocess', 'log'), ..., return_paths = T){
+#' # Interactively set paths
+#' paths <- set_paths()
+#'
+#' # Create batch-level directory with default subdirectories to_reprocess and unusable.
+#' # Retain absolute paths to subdirectories as a character vector.
+#' dirs_for_flagged_imgs <- dir_setup(paths$output_dir)
+
+dir_setup <- function(output_dir, subdirs = c('to_reprocess', 'unusable'), return_paths = T){
 
   # name subdirectories
-  dir_vec <- paste(outdir_root, outdir_name, subdirs, sep = '/')
+  dir_vec <- paste(output_dir, subdirs, sep = '/')
+  names(dir_vec) <- subdirs
 
   # create subdirectories
-  invisible(lapply(dir_vec, dir_create_silent, ...))
+  invisible(lapply(dir_vec, dir_create_silent, recursive = T))
 
   if (return_paths) {
     # return subdirectory paths
@@ -89,58 +110,73 @@ dir_setup <- function(outdir_root, outdir_name = 'slakes_processed', subdirs = c
 
 }
 
-# open file explorer at specified directory
-#' Title
+#' Open File Explorer
 #'
-#' @param dir
+#' Open one or more directories in the system file explorer.
 #'
-#' @return
+#' @param dirs character vector with absolute paths to one or more directories to open.
+#'
 #' @export
 #'
 #' @examples
-opendir <- function(dir){
-  cur_dir <- getwd()
-  setwd(dir)
-  if (.Platform['OS.type'] == "windows"){
-    shell.exec(".")
-  } else {
-    system(paste(Sys.getenv("R_BROWSER"), "."))
-  }
-  on.exit(setwd(cur_dir))
-}
-
-# open file explorer in multiple directories
-#' Title
+#' # Interactively set paths
+#' paths <- set_paths()
 #'
-#' @param dirs
+#' # Create batch-level directory with default subdirectories to_reprocess and unusable.
+#' # Retain absolute paths to subdirectories as a character vector.
+#' dirs_for_flagged_imgs <- dir_setup(paths$output_dir)
 #'
-#' @return
-#' @export
+#' # Open directories
+#' opendirs(dirs_for_flagged_imgs)
 #'
-#' @examples
 opendirs <- function(dirs){
-  invisible(lapply(dirs, opendir))
+  invisible(lapply(dirs, function(x){
+    cur_dir <- getwd()
+    setwd(x)
+    if (.Platform['OS.type'] == "windows"){
+      shell.exec(".")
+    } else {
+      system(paste(Sys.getenv("R_BROWSER"), "."))
+    }
+    on.exit(setwd(cur_dir))
+  }
+  ))
 }
 
-# extract metadata for all images in a directory
-#' Title
+#' Extract Image Metadata
 #'
-#' @param dir
-#' @param filename_prefix
-#' @param image_extension
+#' Get EXIF metadata and temporal information for a directory of images.
 #'
-#' @return
+#' @details A simple wrapper around [exifr::read_exif()], supplementing EXIF metadata with temporal information extracted from image file names. Within the batch-level directory `dir`, it is assumed that images are organized into replicate-level subdirectories. Each subdirectory should contain an initial image of air-dry soil, an image of soil collected upon submersion in water, and a final image collected upon conclusion of the slaking measurement sequence. `get_metadata` calculates the elapsed time for each subdirectory as well as the elapsed time of slaking, assuming the second image corresponds to time zero.
+#'
+#' @param dir character string with relative or absolute path to directory containing images
+#' @param filename_prefix character string indicating any text preceding the date and time in image file names
+#' @param image_extension character string indicating the image file type
+#' @param datetime_fmt character string indicating the date and time format used in image file names (see [base::strptime()])
+#'
+#' @return A data frame (tibble) containing EXIF metadata and temporal information extracted from image file names.
 #' @export
 #'
 #' @examples
-get_metadata <- function(dir, filename_prefix = 'Develop', image_extension = 'jpg'){
+#' # Interactively set paths
+#' paths <- set_paths(parent_dir_img = 'inst/images')
+#'
+#' # Get image metadata
+#' (metadata <- get_metadata(paths$image_dir), filename_prefix = 'IMG_')
+#'
+#'
+get_metadata <- function(dir, filename_prefix, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S'){
+
+  if (substr(image_extension, 1, 1) != '.') {
+    image_extension <- paste0('.', image_extension)
+  }
 
   metadat <- exifr::read_exif(list.files(dir, full.names = T, recursive = T, pattern = paste0(image_extension, '$')))
 
   metadat <- metadat %>%
     dplyr::mutate(datetime = gsub(filename_prefix, "", FileName),
-                  datetime = gsub(paste0('.', image_extension), "", datetime),
-                  datetime = strptime(datetime, format = '%Y%m%d_%H%M%S')) %>%
+                  datetime = gsub(image_extension, "", datetime),
+                  datetime = strptime(datetime, format = datetime_fmt)) %>%
     dplyr::group_by(Directory) %>%
     dplyr::mutate(elapsed_time_m = as.numeric(datetime - min(datetime)) / 60,
                   slaking_elapsed_time_m = elapsed_time_m - min(elapsed_time_m[elapsed_time_m > 0])) # total elapsed time of measurements and elasped time of slaking, assuming each directory contains only one image prior to submersion
@@ -149,35 +185,34 @@ get_metadata <- function(dir, filename_prefix = 'Develop', image_extension = 'jp
 
 }
 
-
-# # starttime <- min(area_df$timestamp[-which.min(area_df$timestamp)])
-# # stoptime <- max(area_df$timestamp)
-# #
-# # stoptime - starttime
-# #
-# library(ggplot2);library(dplyr);library(tidyr)
-#
-# test <- test %>% group_by(replicate_id) %>% mutate(starttime = min(timestamp[-which.min(timestamp)]), elapsed_time = as.numeric(timestamp - starttime)/60)
-
-# inspect metadata for each replicate
-#' Title
+#' Inspect Image Metadata
 #'
-#' @param metadata
-#' @param image_extension
-#' @param final_img_time_min
-#' @param final_img_tol_sec
-#' @param n_images_min
-#' @param n_images_max
+#' Evaluate image metadata and identify replicates that do not meet expectations for data analysis.
 #'
-#' @return
+#' @details `check_replicates()` evaluates the suitability of replicates (i.e., subdirectories for which metadata were extracted using [SlakeItEasy::get_metadata()]) for analysis. Replicates are evaluated based on number of images per subdirectory, image size, and the timing of the final image.
+
+#' @param metadata data frame of image metadata as returned by [SlakeItEasy::get_metadata()]
+#' @param final_img_time_min time of final image capture (in minutes) after submersion
+#' @param final_img_tol_sec tolerance for time of final image capture (in seconds)
+#' @param n_images_min minimum number of images required per replicate
+#' @param n_images_max maximum number of images allowed per replicate
+#'
+#' @return A list of varying length. The first element is a data frame with one row summarizing the evaluation of each replicate. The second element is a character vector of absolute paths to usable replicates. Additional character vectors may be included listing replicates that were flagged for missing images (fewer images than `n_images_min`), for having extra images (more images than `n_images_max`), for containing images of more than one size, or for lacking a final image at the expected time (`final_img_time_min` \eqn{\pm} `final_img_tol_sec`).
 #' @export
 #'
 #' @examples
-check_replicates <- function(metadata, image_extension = "jpg", final_img_time_min = 10, final_img_tol_sec = 30, n_images_min = 3, n_images_max = 3) {
+#' # Interactively set paths
+#' paths <- set_paths()
+#'
+#' # Get image metadata
+#' metadata <- get_metadata(paths$image_dir)
+#'
+#' # Inspect image metadata
+#' check <- check_replicates(metadata)
+#'
+#'
 
-  # number of images per directory
-  # final image is available at 10 min +/- tolerance (final_img_tol_sec)
-  # initial image and final image are same size
+check_replicates <- function(metadata, final_img_time_min = 10, final_img_tol_sec = 30, n_images_min = 3, n_images_max = 3) {
 
  m <- metadata  %>%
     dplyr::arrange(Directory, datetime) %>%
@@ -206,56 +241,31 @@ check_replicates <- function(metadata, image_extension = "jpg", final_img_time_m
  out <- list(m = m, usable = usable)
 
  if (missing_imgs > 0) {
-   cat(missing_imgs, ' replicates do not have all images.\n')
+   warning(paste(missing_imgs, ' replicates do not have all images.'))
    out[['missing_imgs']] <- m$Directory[m$n_images < 3]
  }
 
  if (extra_imgs > 0) {
-   cat(extra_imgs, ' replicates have more images than expected.\n')
+   warning(paste(extra_imgs, ' replicates have more images than expected.'))
    out[['extra_imgs']] <- m$Directory[m$n_images > 3]
  }
 
  if (multiple_sizes > 0) {
-   cat(multiple_sizes, ' replicates have inconsistent image resolution.\n')
+   warning(paste(multiple_sizes, ' replicates have inconsistent image resolution.'))
    out[['multiple_sizes']] <- m$Directory[m$n_image_sizes > 1]
  }
 
  if (wrong_final_time > 0) {
-   cat(wrong_final_time, ' replicates do not have a final image at the correct time.\n')
+   warning(paste(wrong_final_time, ' replicates do not have a final image at the correct time.'))
    out[['wrong_final_time']] <- m$Directory[m$final_image_within_tol == 0]
  }
 
  if (n_sizes_batch > 1) {
-   cat(n_sizes_batch, ' distinct image resolutions detected in batch.\n')
+   warning(paste(n_sizes_batch, ' distinct image resolutions detected in batch.'))
  }
 
  cat(n_usable, '/', nrow(m), ' replicates pass QA/QC.\n')
 
  return(out)
-
 }
-
-
-## American Ag Lab-specific: get sample IDs from excel file(s)
-
-#' Title
-#'
-#' @param dir
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_IDs <- function(dir) {
-
-  ids <- list.files(dir, recursive = T, full.names = T, pattern = '.xls')
-
-  ids <- lapply(ids, readxl::read_excel, .name_repair = 'universal', col_type = 'text')
-
-  ids <- do.call(dplyr::bind_rows, ids)
-
-  return(ids)
-
-}
-
 

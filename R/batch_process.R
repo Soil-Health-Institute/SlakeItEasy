@@ -1,4 +1,4 @@
-#' Title
+#' Process a Directory of Replicates
 #'
 #' @param dir_vec
 #' @param parallel
@@ -9,22 +9,20 @@
 #' @export
 #'
 #' @examples
-batch_process <- function(dir_vec, parallel = T, ncores = parallel::detectCores() - 1, return_output = F, ...) {
+batch_process <- function(dir_vec, parallel = T, ncores = parallel::detectCores() - 1, return_output = T, ...) {
 
    if (parallel) {
-     outlist <- parallel::mclapply(dir_vec, function(x) process_petri(path_to_image_set =  x, ...), ncores = 7)
+     outdf <- do.call(rbind,  parallel::mclapply(dir_vec, function(x) data.frame(image_set = x, stab10 = process_petri(path_to_image_set =  x, ...)), mc.cores = ncores))
    } else {
-     outlist <- lapply(dir_vec, function(x) {
-       cat(paste0('Processing ', x, '...\n'))
-       process_petri(path_to_image_set =  x, ...)
+     outdf <- do.call(rbind, lapply(dir_vec, function(x) {
+       data.frame(image_set = x, stab10 = process_petri(path_to_image_set =  x, ...))
      }
-     )
+     ))
    }
 
    if (return_output) {
-     return(outlist)
+     return(outdf)
    }
-
 }
 
 

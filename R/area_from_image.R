@@ -1,33 +1,66 @@
-#' Title
+#' Get Soil Area for a Single Image
 #'
-#' @param path_to_rgb
-#' @param interactive
-#' @param circular_crop
-#' @param d
-#' @param max_rel_dist_from_centroid
-#' @param max_rel_dist_from_center
-#' @param peds_in_initial
-#' @param fixed_crop_fraction
-#' @param max_rel_objlength
-#' @param autocrop_buffer
-#' @param erode_kern
-#' @param dilate_kern
-#' @param normdiff_min
-#' @param h_offset
-#' @param v_offset
-#' @param w_new
-#' @param h_new
+#' Determine the total area (in pixels) of soil present within an image after masking. Masking can be conducted interactively, programmatically with circular or rectangular areas, or automatically using the normalized difference between red and green bands.
 #'
-#' @return
+#' @details `area_from_image()` can be called directly to classify soil in a single image, given the path to the image file, or via [SlakeItEasy::process_petri()] to classify a set of images corresponding to a measurement sequence for a single replicate.
+#'
+#' Proper masking of non-soil objects is critical for reliable classification with Otsu's histogram thresholding method (see [EBImage::otsu()]). Programmatic circular masking (interactive = F, circular = T) is recommended for most use cases. Classification results are provided as a binary image, with each soil object labeled using [EBImage::bwlabel()], and as a false color overlay to support evaluation of potential sensitive to masking parameters.
+#'
+#' @param path_to_rgb character string containing relative or absolute path to color image
+#' @param interactive logical. If `TRUE`, image masking will be conducted interactively.
+#' @param circular_mask logical. If `TRUE`, a circular mask will be applied.
+#' @param false_color character string with color name or hex code for false color overlay
+#' @param d diameter of circular mask as a proportion of image width
+#' @param h_offset horizontal offset for center of circular mask
+#' @param v_offset vertical offset for center of circular mask
+#' @param w_new width for image resizing
+#' @param h_new height for image resizing
+#' @param aggregates_in_initial number of soil aggregates in initial (pre-submersion) image. If not NULL (default), this number of the largest aggregates will be retained, and all smaller objects classified as soil will be disregarded.
+#' @param max_rel_dist_from_centroid maximum allowed relative distance from centroid of largest three objects
+#' @param max_rel_dist_from_center maximum allowed relative distance from image center
+#' @param fixed_crop_fraction proportion of image width to crop. If not NULL (default), must be between zero and one (exclusive).
+#' @param max_rel_objlength maximum allowed object length as a proportion of image width
+#' @param automask_buffer proportional buffer for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL.
+#' @param erode_kern erosion kernel size for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL. See [EBImage::erode()].
+#' @param dilate_kern dilation kernel size for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL. See [EBImage::dilate()].
+#' @param normdiff_min minimum value of normalized difference between red and green bands for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL. See [SlakeItEasy::norm_diff()].
+#'
+#' @return A three-element list, containing the area of soil (in pixels), an `Image` object with labeled soil pixels (see [EBImage::bwlabel()]), and the original `Image` object with soil pixels overlain in false color.
 #' @export
 #'
-#' @examples
-area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d = 0.7, max_rel_dist_from_centroid = 1.3, max_rel_dist_from_center = 0.37, peds_in_initial = NULL, fixed_crop_fraction = NULL, max_rel_objlength = 0.3, autocrop_buffer = 0.15, erode_kern = 11, dilate_kern = 31, normdiff_min = 0, h_offset = 0, v_offset = 0, w_new = NULL, h_new = NULL) {
+#' @examples # path to initial (pre-submersion) image
+#' f_init <- system.file("images/exp1_1", "IMG_20220701_120110.jpg", package="SlakeItEasy")
+#'
+#' # path to second image (time zero of slaking)
+#' f_t0 <- system.file("images/exp1_1", "IMG_20220701_120230.jpg", package="SlakeItEasy")
+#'
+#' # path to final image (ten minutes of slaking)
+#' f_t10 <- system.file("images/exp1_1", "IMG_20220701_121230.jpg", package="SlakeItEasy")
+#'
+#' # processing with default circular mask
+#' a_init <- area_from_image(f_init, aggregates_in_initial = 3)
+#' a_t0 <- area_from_image(f_t0)
+#' a_t10 <- area_from_image(f_t10)
+#'
+#' cat('initial area: ', a_init$area, '\n',
+#' 'area upon submersion: ', a_t0$area, '\n',
+#' 'final area: ', a_t10$area, '\n',
+#' 'stab10: ', a_init$area/a_t10$area)
+#'
+#' par(mfrow = c(1, 3))
+#' plot(a_init$false_color)
+#' plot(a_t0$false_color)
+#' plot(a_t10$false_color)
+#'
+#'
+area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TRUE, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, w_new = NULL, h_new = NULL, aggregates_in_initial = NULL, max_rel_dist_from_centroid = 1.3, max_rel_dist_from_center = 0.37,  fixed_crop_fraction = NULL, max_rel_objlength = 0.3, automask_buffer = 0.15, erode_kern = 11, dilate_kern = 31, normdiff_min = 0) {
 
+  # read in image
   img_orig <- read_to_portrait(path_to_rgb)
 
   resized <- F
 
+  # if new dimensions (w_new or h_new) are provided, resize the image
   if (!is.null(w_new) & !is.null(h_new)) {
 
     dims <- dim(img_orig)
@@ -41,9 +74,11 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
 
   }
 
+  # interactive masking
 
   if (interactive) {
-    if (!circular_crop) {
+    # rectangular mask
+    if (!circular_mask) {
       plot(img_orig)
       p_out <- set_crop()
       tmp <- crop_image(img_orig, p_out, mask_only = T)
@@ -51,54 +86,63 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
       bbox <- do.call(cbind, p_out)
       tmp_binary_labeled <- drop_edge_objs(tmp_binary, bbox)
     } else{
-      tmp <- crop_image_circular(img_orig, d = d, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = interactive, h_offset = h_offset, v_offset = v_offset)
+      # circular mask
+      tmp <- mask_image_circular(img_orig, d = d, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = interactive, h_offset = h_offset, v_offset = v_offset)
+      # classification
       tmp_binary <- rgb_to_binary(tmp)
-      tmp_binary_labeled <- bwlabel(tmp_binary)
-      storage.mode(tmp_binary_labeled) <- 'integer'
-      attr(tmp_binary_labeled, "circular_crop_center") <- attr(tmp, "circular_crop_center")
-      attr(tmp_binary_labeled, "circular_crop_diam") <- attr(tmp, "circular_crop_diam")
-    }
+      tmp_binary_labeled <- drop_edge_objs(tmp_binary)
 
-    if (!is.null(peds_in_initial)) {
+      storage.mode(tmp_binary_labeled) <- 'integer'
+
+      attr(tmp_binary_labeled, "circular_mask_center") <- attr(tmp, "circular_mask_center")
+      attr(tmp_binary_labeled, "circular_mask_diam") <- attr(tmp, "circular_mask_diam")
+    }
+    # retain only largest aggregates in initial (pre-submersion) image
+    if (!is.null(aggregates_in_initial)) {
+
+      tmp_binary_labeled <- reenumerate(tmp_binary_labeled)
 
       features <- data.frame(computeFeatures.shape(tmp_binary_labeled), computeFeatures.moment(tmp_binary_labeled))
 
       features$obj_id <- 1:nrow(features)
 
-      features_filtered <- dplyr::slice_max(features, s.area, n = peds_in_initial)
+      features_filtered <- dplyr::slice_max(features, s.area, n = aggregates_in_initial)
 
       obj_to_drop <- unique(features$obj_id[!(features$obj_id %in% features_filtered$obj_id)])
 
       tmp_binary_labeled <- rmObjects(tmp_binary_labeled, obj_to_drop, reenumerate = F)
-      attr(tmp_binary_labeled, "peds_in_initial") <- peds_in_initial
+      attr(tmp_binary_labeled, "aggregates_in_initial") <- aggregates_in_initial
 
     }
 
-
     msk <- tmp_binary_labeled
-    msk <- paintObjects(msk, img_orig, col=c('red', 'red'), opac = c(1, 0.4))
+    msk <- paintObjects(msk, img_orig, col= rep(false_color, 2), opac = c(1, 0.4))
 
     plot(msk)
 
     Sys.sleep(0.5)
 
-    area_out <- sum(tmp_binary)
+    tmp_binary <- as.numeric(tmp_binary_labeled)
+
+    storage.mode(tmp_binary) <- 'logical'
+
+    area_out <- sum(tmp_binary, na.rm = T)
 
     attr(tmp_binary_labeled, 'crop_type') <- 'interactive'
 
-    return(list(area = rep(area_out, 3), classified_image = tmp_binary_labeled, masked_image = msk))
+    return(list(area = area_out, classified_image = tmp_binary_labeled, false_color = msk))
 
   } else{
 
   dims <- dim(img_orig)
 
-  if (circular_crop) {
-    tmp <- crop_image_circular(img_orig, d = d, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = interactive, h_offset = h_offset, v_offset = v_offset)
+  if (circular_mask) {
+    tmp <- mask_image_circular(img_orig, d = d, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = interactive, h_offset = h_offset, v_offset = v_offset)
     tmp_binary <- rgb_to_binary(tmp)
     tmp_binary_labeled <- bwlabel(tmp_binary)
     storage.mode(tmp_binary_labeled) <- 'integer'
-    attr(tmp_binary_labeled, "circular_crop_center") <- attr(tmp, "circular_crop_center")
-    attr(tmp_binary_labeled, "circular_crop_diam") <- attr(tmp, "circular_crop_diam")
+    attr(tmp_binary_labeled, "circular_mask_center") <- attr(tmp, "circular_mask_center")
+    attr(tmp_binary_labeled, "circular_mask_diam") <- attr(tmp, "circular_mask_diam")
   } else {
     if (!is.null(fixed_crop_fraction)) {
 
@@ -125,8 +169,8 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
 
       bbox <- matrix_bbox(1, img_orig_b1b2_ed_binary)
 
-      bbox[1,] <-  round(bbox[1,] * (1 - autocrop_buffer))
-      bbox[2,] <-  round(bbox[2,] * (1 + autocrop_buffer))
+      bbox[1,] <-  round(bbox[1,] * (1 - automask_buffer))
+      bbox[2,] <-  round(bbox[2,] * (1 + automask_buffer))
 
       bbox[1,] <- sapply(1:2, function(x) max(c(bbox[1,x], 1)))
       bbox[2,] <- sapply(1:2, function(x) min(c(bbox[2,x], dims[x])))
@@ -142,7 +186,7 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
   }
 
   if((nrow(table(tmp_binary_labeled)) - 1) < 3) {
-    stop("Fewer than 3 objects in image interior. Try reducing fixed_crop_fraction or expanding manual crop box.", call. = F)
+    stop("Fewer than 3 objects in image interior. Try reducing fixed_crop_fraction or expanding manual mask area.", call. = F)
   }
 
     tmp_binary_labeled <- reenumerate(tmp_binary_labeled)
@@ -164,16 +208,13 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
 
     features_filtered <- features[features$m.majoraxis <= maximum_obj_length_for_centroid & features$dist_to_image_center <= maximum_distance_from_center,]
 
-    if (!is.null(peds_in_initial)) {
+    if (!is.null(aggregates_in_initial)) {
 
-      features_filtered <- dplyr::slice_max(features_filtered, s.area, n = peds_in_initial)
+      features_filtered <- dplyr::slice_max(features_filtered, s.area, n = aggregates_in_initial)
 
-      attr(tmp_binary_labeled, "peds_in_initial") <- peds_in_initial
+      attr(tmp_binary_labeled, "aggregates_in_initial") <- aggregates_in_initial
 
     }
-
-    # plot(tmp_binary_labeled)
-    # with(features_filtered, points(m.cx, m.cy, col = 'red'))
 
     features_filtered$dist_to_centroid <- with(features_filtered, dist_from_n_objs(m.cx, m.cy, area_var = s.area))
 
@@ -194,7 +235,8 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
 
     area_max <- sum(features_filtered$s.area)
 
-    area_out <- c(area_min, area_at_cutoff, area_max)
+    area_out <- area_at_cutoff
+    # area_out <- c(area_min, area_at_cutoff, area_max)
 
   img_attributes <- attributes(tmp)
 
@@ -202,7 +244,7 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
 
   img_attributes_to_write <- img_attributes[!names(img_attributes) %in% img_attributes_nowrite]
 
-  for (i in 1:length(img_attributes_to_write)) {
+  for (i in seq_along(img_attributes_to_write)) {
     attr(tmp_binary_labeled, names(img_attributes_to_write)[i]) <- img_attributes_to_write[[i]]
   }
 
@@ -213,8 +255,8 @@ area_from_image <- function(path_to_rgb, interactive = F, circular_crop = F,  d 
   attr(tmp_binary_labeled, 'resized') <- resized
 
   msk <- tmp_binary_labeled
-  msk <- paintObjects(msk, img_orig, col=c('red', 'red'), opac = c(1, 0.4))
+  msk <- paintObjects(msk, img_orig, col= rep(false_color, 2), opac = c(1, 0.4))
 
-  return(list(area = area_out, classified_image = tmp_binary_labeled, masked_image = msk))
+  return(list(area = area_out, classified_image = tmp_binary_labeled, false_color = msk))
 
 }
