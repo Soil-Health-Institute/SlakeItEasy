@@ -3,7 +3,7 @@
 {SlakeItEasy} provides utility functions to estimate soil aggregate stability via analysis of images of air-dried soil and soil undergoing slaking in water, following [Fajardo et al. (2016)](https://www.sciencedirect.com/science/article/pii/S0167198716300952). Functions are provided to analyze individual images, multiple images per sample, and the output of high-throughput image aquisition schemes (e.g., multiple replicates, multiple samples).
 
 <a href="https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/SIE_sticker.png">
-<img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/SIE_sticker.png" alt = "SlakeItEasy hexsticker" title = "SlakeItEasy hexsticker" width = "10%" height = "10%" hspace="15" vspace="15" align="right"/></a>
+<img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/SIE_sticker.png" alt = "SlakeItEasy hexsticker" title = "SlakeItEasy hexsticker" width = "40%" height = "40%" hspace="15" vspace="15" align="right"/></a>
     
 ## Installation
 
@@ -24,7 +24,7 @@ sudo apt-get install libfftw3-dev
 For batch processing, image sequences (i.e., images of air-dried soil, soil upon submersion in water, and soil after slaking for a predetermined interval) should be organized into one directory per replicate (e.g., per petri dish). To make data wrangling easier, name directories with the sample ID and replicate number (e.g., SampleID_ReplicateNumber, as below).
 
 <a href="https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png">
-<img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png" alt = "Example file structure" title = "Example file structure" width = "60%" height = "60%" hspace="15" vspace="15" align="center"/></a>
+<img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png" alt = "Example file structure" title = "Example file structure" width = "20%" height = "20%" hspace="15" vspace="15" align="center"/></a>
 
 ## Example workflow
 
