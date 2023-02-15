@@ -10,7 +10,7 @@
 After installing [R](https://www.r-project.org/) and [R Studio](https://posit.co/download/rstudio-desktop/), the development version of {SlakeItEasy} and its dependencies can be installed using the {remotes} package.
 
 ```r
-remotes::install_github('latenooker/SlakeItEasy')
+remotes::install_github('Soil-Health-Institute/SlakeItEasy')
 ```
 
 If {fftwtools} and {EBImage} fail to install on Linux, run the following in the terminal:
