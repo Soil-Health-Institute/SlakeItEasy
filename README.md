@@ -24,7 +24,7 @@ sudo apt-get install libfftw3-dev
 For batch processing, image sequences (i.e., images of air-dried soil, soil upon submersion in water, and soil after slaking for a predetermined interval) should be organized into one directory per replicate (e.g., per petri dish). To make data wrangling easier, name directories with the sample ID and replicate number (e.g., SampleID_ReplicateNumber, as below).
 
 <a href="https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png">
-<img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png" alt = "Example file structure" title = "Example file structure" width = "20%" height = "20%" hspace="15" vspace="15" align="center"/></a>
+<img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png" alt = "Example file structure" title = "Example file structure" width = "25%" height = "25%" hspace="15" vspace="15" align="middle"/></a>
 
 ## Example workflow
 
