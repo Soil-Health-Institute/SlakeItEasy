@@ -34,7 +34,13 @@ Detailed vignettes are under development. In the meantime, an example workflow c
 invisible(rstudioapi::navigateToFile(system.file("demo", "02_workflow.R", package = "SlakeItEasy")))
 ```
 
+## Citation
 
+To cite {SlakeItEasy} in publications, run the following to generate a text reference and BibTeX entry:
+
+```r
+citation('SlakeItEasy')
+```
 
 
 
