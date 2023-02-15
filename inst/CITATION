@@ -7,6 +7,6 @@ citEntry(
   note = "R package version 0.1.0.9000",
   url = "https://github.com/Soil-Health-Institute/SlakeItEasy",
   year     = "2023",
-  textVersion = "Looker, N. (2023). SlakeItEasy: Image-Based Estimation of Soil Aggregate Stability. R package version 0.1.0.9000. <https://github.com/Soil-Health-Institute/SlakeItEasy>.",
+  textVersion = "Looker, N. (2023). SlakeItEasy: Image-Based Estimation of Soil Aggregate Stability. R package version 0.1.0.9000. <https://github.com/Soil-Health-Institute/SlakeItEasy>. doi:10.5281/zenodo.7644578",
   doi = "10.5281/zenodo.7644578"
 )
