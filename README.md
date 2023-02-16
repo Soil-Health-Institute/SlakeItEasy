@@ -10,6 +10,9 @@
 After installing [R](https://www.r-project.org/) and [R Studio](https://posit.co/download/rstudio-desktop/), the development version of {SlakeItEasy} and its dependencies can be installed using the {remotes} package.
 
 ```r
+if (!require(remotes)) {
+install.packages('remotes')
+}
 remotes::install_github('Soil-Health-Institute/SlakeItEasy')
 ```
 
