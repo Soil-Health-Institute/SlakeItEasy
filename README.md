@@ -44,7 +44,7 @@ For batch processing, image sequences (i.e., images of air-dried soil, soil upon
 Detailed vignettes are under development. In the meantime, an example workflow can be accessed within R Studio as follows (or by clicking [here](https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/inst/demo/example_workflow.R)).
 
 ```r
-invisible(rstudioapi::navigateToFile(system.file("demo", "02_workflow.R", package = "SlakeItEasy")))
+invisible(rstudioapi::navigateToFile(system.file("demo", "example_workflow.R", package = "SlakeItEasy")))
 ```
 
 ## Citation
