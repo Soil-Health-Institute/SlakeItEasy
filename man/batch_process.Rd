@@ -6,7 +6,7 @@
 \usage{
 batch_process(
   dir_vec,
-  parallel = T,
+  parallel = F,
   ncores = parallel::detectCores() - 1,
   return_output = T,
   ...

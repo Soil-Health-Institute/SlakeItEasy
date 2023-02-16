@@ -15,6 +15,7 @@ URL: https://soilhealthinstitute.org/,
 biocViews:
 Imports: 
     dplyr,
+    tidyr,
     EBImage,
     exifr,
     magrittr,
