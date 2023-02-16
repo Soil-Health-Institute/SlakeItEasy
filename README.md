@@ -13,6 +13,12 @@ After installing [R](https://www.r-project.org/) and [R Studio](https://posit.co
 remotes::install_github('Soil-Health-Institute/SlakeItEasy')
 ```
 
+Note that users on Windows may need to install [Strawberry Perl](https://strawberryperl.com/) before using image metadata extraction utilities from the {exifr} package. After installing Strawberry Perl, complete configuration in `R` as follows:
+
+```r
+exifr::configure_exiftool()
+```
+
 If {fftwtools} and {EBImage} fail to install on Linux, run the following in the terminal:
 
 ```console
@@ -21,7 +27,7 @@ sudo apt-get install libfftw3-dev
 
 ## File structure
 
-For batch processing, image sequences (i.e., images of air-dried soil, soil upon submersion in water, and soil after slaking for a predetermined interval) should be organized into one directory per replicate (e.g., per petri dish). To make data wrangling easier, name directories with the sample ID and replicate number (e.g., SampleID_ReplicateNumber, as below).
+For batch processing, image sequences (i.e., images of air-dried soil, soil upon submersion in water, and soil after slaking for a predetermined interval) should be organized into one directory per replicate (e.g., per petri dish). To make data wrangling easier, name directories with the sample ID and Petri dish number (e.g., SampleID_PetriDishNumber, as below).
 
 <a href="https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png">
 <img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/file_structure.png" alt = "Example file structure" title = "Example file structure" width = "25%" height = "25%" hspace="15" vspace="15" align="middle"/></a>
