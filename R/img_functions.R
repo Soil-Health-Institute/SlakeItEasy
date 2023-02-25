@@ -200,6 +200,9 @@ rgb_to_binary <- function(img) {
   # apply threshold to image
   img_binary <- 1 - (img > threshold)
 
+  # replace NAs (from mask/crop) with zeroes - otherwise, NAs will be labeled as objects
+  img_binary[is.na(img_binary)] <- 0
+
   storage.mode(img_binary) <- 'integer'
 
   attr(img_binary, 'otsu_threshold') <- threshold

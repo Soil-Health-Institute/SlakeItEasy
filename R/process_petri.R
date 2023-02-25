@@ -56,7 +56,7 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix, image_exte
     h_new <- NULL
   }
 
-  timestamp_orig <- gsub(paste0('.', image_extension),  "", image_metadata$FileName) %>%
+  timestamp_orig <- gsub(image_extension,  "", image_metadata$FileName) %>%
     gsub(filename_prefix, "", .)
 
   timestamp <- strptime(timestamp_orig, format = datetime_fmt)
