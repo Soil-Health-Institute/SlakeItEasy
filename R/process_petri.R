@@ -73,7 +73,7 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix, image_exte
 
   area_df <- data.frame(image_set = path_to_image_set, FileName = image_metadata$FileName, timestamp, area_pixels = c(area_airdry$area, sapply(area_list, function(x) x$area)))
 
- area_final <- area_df$area_pixels[max(1 + which(abs(diff(area_df$timestamp) - final_img_time_min) <= final_img_tol_sec/60))]
+ area_final <- area_df$area_pixels[max(which(abs((area_df$timestamp - area_df$timestamp[2])/60 - final_img_time_min) <= final_img_tol_sec/60))]
 
  stab10 <- area_airdry$area/area_final
 
