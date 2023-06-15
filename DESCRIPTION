@@ -1,7 +1,7 @@
 Type: Package
 Package: SlakeItEasy
 Title: Image-Based Estimation of Soil Aggregate Stability
-Version: 0.1.0.9000
+Version: 0.2.0
 Author: Nate Looker
 Maintainer: Nate Looker <nlooker@soilhealthinstitute.org>
 Description: Utility functions to determine the projected area of soil
