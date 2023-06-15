@@ -43,23 +43,26 @@ if (length(metadata_qaqc$extra_imgs) > 0) {
 # test <- area_from_image(with(metadata[1,], paste0(Directory, '/', FileName)), circular_mask = T, d = 0.73, interactive = T)
 
 # automated batch processing with a circular crop -------------------------
-results <- batch_process(dir_vec = to_analyze, outdir = paths$output_dir, filename_prefix = 'IMG_', match_resolution = T, circular_mask = T, parallel = T)
+results <- batch_process(dir_vec = to_analyze, outdir = paths$output_dir, filename_prefix = 'IMG_', match_resolution = !is.null(metadata_qaqc$multiple_sizes), circular_mask = T, parallel = T, d = 0.75, batch_dir = paths$image_dir, false_color = 'green')
 
 # inspect classifications and sort suboptimal images ----------------------
 reprocess_dir <- dirs_for_flagged_imgs['to_reprocess']
 unusable_dir <- dirs_for_flagged_imgs['unusable']
+
 opendirs(c(unusable_dir, reprocess_dir, paste0(paths$output_dir, '/images_false_color')))
 
 # prepare for manual processing -------------------------------------------
 images_to_reprocess <- list.files(reprocess_dir)
 
-dir_vec2 <- unique(sapply(strsplit(images_to_reprocess, '_x_'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')))
+replicates_to_reprocess <- unique(sapply(strsplit(images_to_reprocess, '_x_'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')))
+
+replicates_to_reprocess <- paste0(paths$image_dir, '/', replicates_to_reprocess)
 
 # process images requiring manual crop ------------------------------------
-results2 <- lapply(dir_vec2, function(i) {
+results2 <- lapply(replicates_to_reprocess, function(i) {
   print(paste0('Processing ', i, '...'))
 
-  out <- data.frame(image_set = i, stab10 = process_petri(i, interactive = T, match_resolution = T, circular_mask = T, filename_prefix = 'IMG_', outdir = paths$output_dir, aggregates_in_initial = 3))
+  out <- process_petri(i, interactive = T, match_resolution = !is.null(metadata_qaqc$multiple_sizes), circular_mask = T, filename_prefix = 'IMG_', outdir = paths$output_dir, aggregates_in_initial = 3, batch_dir = paths$image_dir, false_color = 'green')
 
   return(out)
 }
@@ -79,11 +82,28 @@ if (nrow(results2) > 0) {
 }
 
 results <- results %>%
-  mutate(replicate_id = sapply(strsplit(image_set, '/'), function(x) x[[length(x)]]),
+  mutate(parent_dir = sapply(strsplit(image_set, '/'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')),
+         replicate_id = sapply(strsplit(image_set, '/'), function(x) x[[length(x)]]),
          replicate_num = substr(replicate_id, nchar(replicate_id), nchar(replicate_id)),
          sample_id = sapply(strsplit(replicate_id, '_'), function(x) x[[1]])) %>%
   filter(!replicate_id %in% unusable)
 
+# concatenate results (when in new session) -------------------------------
+
+if (!exists('results')) {
+
+  path_to_results <- list.files(paste0(paths$output_dir, '/stability_index'), full.names = T, pattern = '.csv$')
+
+  results <- do.call(rbind, lapply(path_to_results, read.csv))
+
+  results <- results %>%
+    mutate(parent_dir = sapply(strsplit(image_set, '/'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')),
+           replicate_id = sapply(strsplit(image_set, '/'), function(x) x[[length(x)]]),
+           replicate_num = substr(replicate_id, nchar(replicate_id), nchar(replicate_id)),
+           sample_id = sapply(strsplit(replicate_id, '_'), function(x) x[[1]])) %>%
+    filter(!replicate_id %in% unusable)
+
+}
 
 # save results to disk ----------------------------------------------------
 
@@ -94,6 +114,6 @@ results %>%
 # summarize results by sample ---------------------------------------------
 
 results %>%
-  group_by(sample_id) %>%
-  summarise(stab10_mg = mean_geom(stab10), stab10_cv = cv(stab10), nreps = n())
-
+  group_by(parent_dir, sample_id) %>%
+  summarise(stab_gmean = mean_geom(stab), stab_cv = cv(stab), nreps = n()) %>%
+  write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_means.csv'), row.names = F)

@@ -358,41 +358,6 @@ dist_from_n_objs <- function(xcoord, ycoord, area_var, n = 3) {
 
 }
 
-# generate_ring <- function(img, r = 0.6, width = 0.01, ring_center = NULL) {
-#
-#   # get length and width (ignore 3rd dimension for multiband images)
-#   dims <- dim(img)[1:2]
-#
-#   # scale factor - fraction of length or width, whichever is smaller
-#   r <- round(min(dims)*r)
-#
-#   # coordinate pairs for all pixels
-#   dims_long <- expand.grid(x = 1:dims[1], y = 1:dims[2])
-#
-#   # if ring center is not specified, set to image centroid
-#   if (is.null(ring_center)) {
-#     ring_center <- dims[1:2]/2
-#   } else {
-#     if (class(ring_center) == 'list') {
-#       ring_center <- unlist(ring_center)
-#     }
-#   }
-#
-#
-#   # distance from each pixel to centroid
-#   dims_long$dist <- as.numeric(sqrt((dims_long[,1] - ring_center[1])^2 + (dims_long[,2] - ring_center[2])^2))
-#
-#   # set values inside and outside of ring to zero
-#   dims_long$dist[abs(dims_long$dist - r)/r > width] <- 0
-#
-#   # set values on ring to one
-#   dims_long$dist[abs(dims_long$dist - r)/r <= width] <- 1
-#
-#   # format values as wide matrix and coerce to EBImage::Image class
-#   tidyr::spread(dims_long, y , dist) %>% dplyr::select(-x) %>% as.matrix() %>% Image()
-#
-# }
-
 # interactively select center for circular crop
 
 set_center <- function(img, h_offset = 0, v_offset = 0) {
@@ -456,7 +421,10 @@ generate_circle <- function(img, d = 0.6, circ_center = NULL) {
   dims_long$dist[dims_long$dist > r]  <- 0
 
   # format values as wide matrix and coerce to EBImage::Image class
-  out <- tidyr::spread(dims_long, y , dist) %>% dplyr::select(-x) %>% as.matrix() %>% EBImage::Image()
+  out <- tidyr::pivot_wider(dims_long, names_from = y , values_from = dist) %>%
+    dplyr::select(-x) %>%
+    as.matrix() %>%
+    EBImage::Image()
 
   return(out)
 

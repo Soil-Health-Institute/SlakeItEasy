@@ -16,10 +16,7 @@
 #' @param w_new width for image resizing
 #' @param h_new height for image resizing
 #' @param aggregates_in_initial number of soil aggregates in initial (pre-submersion) image. If not NULL (default), this number of the largest aggregates will be retained, and all smaller objects classified as soil will be disregarded.
-#' @param max_rel_dist_from_centroid maximum allowed relative distance from centroid of largest three objects
-#' @param max_rel_dist_from_center maximum allowed relative distance from image center
 #' @param fixed_crop_fraction proportion of image width to crop. If not NULL (default), must be between zero and one (exclusive).
-#' @param max_rel_objlength maximum allowed object length as a proportion of image width
 #' @param automask_buffer proportional buffer for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL.
 #' @param erode_kern erosion kernel size for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL. See [EBImage::erode()].
 #' @param dilate_kern dilation kernel size for automated masking. Only used if interactive=FALSE, circular_mask=FALSE, and fixed_crop_fraction=NULL. See [EBImage::dilate()].
@@ -53,7 +50,7 @@
 #' plot(a_t10$false_color)
 #'
 #'
-area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TRUE, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, w_new = NULL, h_new = NULL, aggregates_in_initial = NULL, max_rel_dist_from_centroid = 1.3, max_rel_dist_from_center = 0.37,  fixed_crop_fraction = NULL, max_rel_objlength = 0.3, automask_buffer = 0.15, erode_kern = 11, dilate_kern = 31, normdiff_min = 0) {
+area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TRUE, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, w_new = NULL, h_new = NULL, aggregates_in_initial = NULL,  fixed_crop_fraction = NULL, automask_buffer = 0.15, erode_kern = 11, dilate_kern = 31, normdiff_min = 0) {
 
   # read in image
   img_orig <- read_to_portrait(path_to_rgb)
@@ -100,9 +97,9 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
     # retain only largest aggregates in initial (pre-submersion) image
     if (!is.null(aggregates_in_initial)) {
 
-      tmp_binary_labeled <- reenumerate(tmp_binary_labeled)
+      tmp_binary_labeled <- EBImage::reenumerate(tmp_binary_labeled)
 
-      features <- data.frame(computeFeatures.shape(tmp_binary_labeled), computeFeatures.moment(tmp_binary_labeled))
+      features <- data.frame(EBImage::computeFeatures.shape(tmp_binary_labeled))
 
       features$obj_id <- 1:nrow(features)
 
@@ -110,7 +107,7 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
 
       obj_to_drop <- unique(features$obj_id[!(features$obj_id %in% features_filtered$obj_id)])
 
-      tmp_binary_labeled <- rmObjects(tmp_binary_labeled, obj_to_drop, reenumerate = F)
+      tmp_binary_labeled <- EBImage::rmObjects(tmp_binary_labeled, obj_to_drop, reenumerate = F)
       attr(tmp_binary_labeled, "aggregates_in_initial") <- aggregates_in_initial
 
     }
@@ -139,7 +136,7 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
   if (circular_mask) {
     tmp <- mask_image_circular(img_orig, d = d, stepsize_center = 0.01, stepsize_diam = 0.01, interactive = interactive, h_offset = h_offset, v_offset = v_offset)
     tmp_binary <- rgb_to_binary(tmp)
-    tmp_binary_labeled <- bwlabel(tmp_binary)
+    tmp_binary_labeled <- EBImage::bwlabel(tmp_binary)
     storage.mode(tmp_binary_labeled) <- 'integer'
     attr(tmp_binary_labeled, "circular_mask_center") <- attr(tmp, "circular_mask_center")
     attr(tmp_binary_labeled, "circular_mask_diam") <- attr(tmp, "circular_mask_diam")
@@ -189,54 +186,29 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
     stop("Fewer than 3 objects in image interior. Try reducing fixed_crop_fraction or expanding manual mask area.", call. = F)
   }
 
-    tmp_binary_labeled <- reenumerate(tmp_binary_labeled)
-
-    features <- data.frame(computeFeatures.shape(tmp_binary_labeled), computeFeatures.moment(tmp_binary_labeled))
-
-    features$obj_id <- 1:nrow(features)
-
-    features$m.cx <- round(features$m.cx)
-    features$m.cy <- round(features$m.cy)
-
-    features$perim_to_area <- with(features, s.perimeter / s.area)
-
-    features$dist_to_image_center <- with(features, sqrt((m.cx - dims[1]/2)^2 + (m.cy - dims[2]/2)^2))
-
-    maximum_distance_from_center <- min(max_rel_dist_from_center*dims[1:2])
-
-    maximum_obj_length_for_centroid <- min(max_rel_objlength*dims[1:2])
-
-    features_filtered <- features[features$m.majoraxis <= maximum_obj_length_for_centroid & features$dist_to_image_center <= maximum_distance_from_center,]
+    tmp_binary_labeled <- EBImage::reenumerate(tmp_binary_labeled)
 
     if (!is.null(aggregates_in_initial)) {
 
-      features_filtered <- dplyr::slice_max(features_filtered, s.area, n = aggregates_in_initial)
+      features <- data.frame(EBImage::computeFeatures.shape(tmp_binary_labeled))
 
+      features$obj_id <- 1:nrow(features)
+
+      features_filtered <- dplyr::slice_max(features, s.area, n = aggregates_in_initial)
+
+      obj_to_drop <- unique(features$obj_id[!(features$obj_id %in% features_filtered$obj_id)])
+
+      tmp_binary_labeled <- EBImage::rmObjects(tmp_binary_labeled, obj_to_drop, reenumerate = F)
       attr(tmp_binary_labeled, "aggregates_in_initial") <- aggregates_in_initial
 
+      area_out <- sum(features_filtered$s.area)
+
+
+    } else{
+
+      area_out = sum(tmp_binary)
+
     }
-
-    features_filtered$dist_to_centroid <- with(features_filtered, dist_from_n_objs(m.cx, m.cy, area_var = s.area))
-
-    min_dist <- ceiling(max(dplyr::slice_max(features_filtered, s.area, n = 3)$dist_to_centroid))
-
-    max_dist_from_centroid <- min_dist*max_rel_dist_from_centroid
-
-    obj_to_drop <- unique(c(features_filtered$obj_id[features_filtered$dist_to_centroid > max_dist_from_centroid], features$obj_id[!(features$obj_id %in% features_filtered$obj_id)]))
-
-    tmp_binary_labeled <- rmObjects(tmp_binary_labeled, obj_to_drop, reenumerate = F)
-
-    attr(tmp_binary_labeled, 'max_rel_dist_from_centroid') <- max_rel_dist_from_centroid
-    attr(tmp_binary_labeled, 'max_dist_from_centroid') <- max_dist_from_centroid
-    attr(tmp_binary_labeled, 'max_rel_dist_from_center') <- max_rel_dist_from_center
-
-    area_min <- sum(features_filtered$s.area[features_filtered$dist_to_centroid <= min_dist])
-    area_at_cutoff <- sum(features_filtered$s.area[features_filtered$dist_to_centroid <= max_dist_from_centroid])
-
-    area_max <- sum(features_filtered$s.area)
-
-    area_out <- area_at_cutoff
-    # area_out <- c(area_min, area_at_cutoff, area_max)
 
   img_attributes <- attributes(tmp)
 
@@ -245,7 +217,9 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
   img_attributes_to_write <- img_attributes[!names(img_attributes) %in% img_attributes_nowrite]
 
   for (i in seq_along(img_attributes_to_write)) {
+
     attr(tmp_binary_labeled, names(img_attributes_to_write)[i]) <- img_attributes_to_write[[i]]
+
   }
 
   attr(tmp_binary_labeled, 'fixed_crop_fraction') <- fixed_crop_fraction
@@ -255,7 +229,7 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
   attr(tmp_binary_labeled, 'resized') <- resized
 
   msk <- tmp_binary_labeled
-  msk <- paintObjects(msk, img_orig, col= rep(false_color, 2), opac = c(1, 0.4))
+  msk <- EBImage::paintObjects(msk, img_orig, col= rep(false_color, 2), opac = c(1, 0.4))
 
   return(list(area = area_out, classified_image = tmp_binary_labeled, false_color = msk))
 

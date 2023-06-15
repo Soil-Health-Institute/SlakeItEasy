@@ -26,29 +26,39 @@
 set_paths <- function(parent_dir_img = NULL, parent_dir_out = NULL, batch_name = NULL) {
 
   # if parent_dir_img is unspecified, use location of project as initial directory for selection of directory containing images
+
   if (is.null(parent_dir_img) | !dir.exists(format(parent_dir_img))) {
+
     parent_dir_img <- rstudioapi::getActiveProject()
+
   }
 
   # select directory containing images
 
-  dir_img <- rstudioapi::selectDirectory(label = 'Look for images here', path = parent_dir_img)
-
-  # extract name of directory containing images from absolute path
-  dir_img_rel <- gsub("^.*/", "", dir_img)
+  dir_img <- normalizePath(rstudioapi::selectDirectory(label = 'Look for images here', path = parent_dir_img))
 
   # if parent_dir_out is unspecified, interactively select location for creation of new directory containing output files
+
   if (is.null(parent_dir_out) | !dir.exists(format(parent_dir_out))) {
+
     parent_dir_out <- rstudioapi::selectDirectory(label = 'Save output here')
+
   }
 
   # if batch_name is unspecified, use name of directory containing images
+
   if (is.null(batch_name)) {
+
+    # extract name of directory containing images from absolute path
+    dir_img_rel <- gsub("^.*/", "", dir_img)
+
     batch_name <- dir_img_rel
+
   }
 
-  # create directory for output files
-  dir_out <- paste0(parent_dir_out, '/', batch_name)
+  # path to directory for output files
+
+  dir_out <- suppressWarnings(normalizePath(file.path(parent_dir_out, batch_name)))
 
   cat('Image directory: ', dir_img, '\nOutput directory: ', dir_out, '\n')
 
@@ -97,15 +107,20 @@ dir_create_silent <- function(direc, ...) {
 dir_setup <- function(output_dir, subdirs = c('to_reprocess', 'unusable'), return_paths = T){
 
   # name subdirectories
-  dir_vec <- paste(output_dir, subdirs, sep = '/')
+
+  dir_vec <- file.path(output_dir, subdirs)
+
   names(dir_vec) <- subdirs
 
   # create subdirectories
+
   invisible(lapply(dir_vec, dir_create_silent, recursive = T))
 
   if (return_paths) {
+
     # return subdirectory paths
     return(dir_vec)
+
   }
 
 }
@@ -162,13 +177,19 @@ opendirs <- function(dirs){
 #' paths <- set_paths(parent_dir_img = 'inst/images')
 #'
 #' # Get image metadata
-#' (metadata <- get_metadata(paths$image_dir), filename_prefix = 'IMG_')
+#' (metadata <- get_metadata(paths$image_dir, filename_prefix = 'IMG_'))
 #'
 #'
 get_metadata <- function(dir, filename_prefix, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S'){
 
+  # prepend period to image file extension, if not provided
+
   if (substr(image_extension, 1, 1) != '.') {
     image_extension <- paste0('.', image_extension)
+  }
+
+  if (!tolower(image_extension) %in% c('.jpg', '.png', '.tif', '.tiff')) {
+    stop('Invalid image type. Currently supported formats are JPEG, PNG, and TIFF.', call. = T)
   }
 
   metadat <- exifr::read_exif(list.files(dir, full.names = T, recursive = T, pattern = paste0(image_extension, '$')))
