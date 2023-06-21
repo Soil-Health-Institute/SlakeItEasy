@@ -30,8 +30,8 @@
 #' @examples
 process_petri <- function(path_to_image_set, outdir, filename_prefix, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S', final_img_time_min = 10, final_img_tol_sec = 30, match_resolution = T, safe_sep = '_x_', interactive = F, circular_mask = T, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, aggregates_in_initial = 3, fixed_crop_fraction_initial = NULL, fixed_crop_fraction_run = fixed_crop_fraction_initial, automask_buffer = 0.15, erode_kern = 5, dilate_kern = 31,  normdiff_min = 0, batch_dir = NULL) {
 
-  # get platform-specific file separator character
-  filesep <- .Platform$file.sep
+  # # get platform-specific file separator character
+  # filesep <- .Platform$file.sep
 
   if (!startsWith(image_extension, '.')) {
     image_extension <- paste0('.', image_extension)
@@ -96,11 +96,11 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix, image_exte
 
   out <- c(list(area_airdry), area_list)
 
-  dir_falsecol <- paste0(outdir, filesep, 'images_false_color')
-  dir_binary <- paste0(outdir, filesep, 'images_binary')
-  dir_attr <- paste0(outdir, filesep, 'classification_attributes')
-  dir_results <- paste0(outdir, filesep, 'area_by_time')
-  dir_stab <- paste0(outdir, filesep, 'stability_index')
+  dir_falsecol <- file.path(outdir,  'images_false_color')
+  dir_binary <- file.path(outdir, 'images_binary')
+  dir_attr <- file.path(outdir, 'classification_attributes')
+  dir_results <- file.path(outdir, 'area_by_time')
+  dir_stab <- file.path(outdir, 'stability_index')
 
   suppressWarnings(dir.create(dir_falsecol, recursive = T))
   suppressWarnings(dir.create(dir_binary, recursive = T))
