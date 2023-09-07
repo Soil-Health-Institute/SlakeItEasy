@@ -31,15 +31,15 @@
 process_petri <- function(path_to_image_set, outdir, filename_prefix, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S', final_img_time_min = 10, final_img_tol_sec = 30, match_resolution = T, safe_sep = '_x_', interactive = F, circular_mask = T, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, aggregates_in_initial = 3, fixed_crop_fraction_initial = NULL, fixed_crop_fraction_run = fixed_crop_fraction_initial, automask_buffer = 0.15, erode_kern = 5, dilate_kern = 31,  normdiff_min = 0, batch_dir = NULL) {
 
   # # get platform-specific file separator character
-  # filesep <- .Platform$file.sep
+  filesep <- .Platform$file.sep
 
   if (!startsWith(image_extension, '.')) {
     image_extension <- paste0('.', image_extension)
   }
 
-  # if (!exists(path_to_image_set) & !is.null(batch_dir)) {
-  #   path_to_image_set <- file.path(batch_dir, path_to_image_set)
-  # }
+  if (!dir.exists(path_to_image_set) & !is.null(batch_dir)) {
+    path_to_image_set <- file.path(batch_dir, path_to_image_set)
+  }
 
   image_paths <- list.files(path_to_image_set, full.names = T, pattern = paste0(image_extension, '$'))
 
@@ -110,17 +110,17 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix, image_exte
 
   image_set_prefix <- gsub(filesep, safe_sep, path_to_image_set, fixed = T)
 
-  filenames_falsecol <- paste0(dir_falsecol, filesep, image_set_prefix, safe_sep, timestamp_orig,  image_extension)
-  filenames_binaries <- paste0(dir_binary, filesep, image_set_prefix, safe_sep, timestamp_orig,  image_extension)
+  filenames_falsecol <- file.path(dir_falsecol, paste0(image_set_prefix, safe_sep, timestamp_orig,  image_extension))
+  filenames_binaries <- file.path(dir_binary, paste0(image_set_prefix, safe_sep, timestamp_orig,  image_extension))
 
   invisible(lapply(1:length(out), function(x) EBImage::writeImage(out[[x]]$false_color, filenames_falsecol[x], quality = 50)))
 
   invisible(lapply(1:length(out), function(x) EBImage::writeImage(out[[x]]$classified, filenames_binaries[x], quality = 100)))
 
-  saveRDS(lapply(1:length(out), function(x) attributes(out[[x]]$classified)), paste0(dir_attr, filesep, image_set_prefix, '.rds'))
+  saveRDS(lapply(1:length(out), function(x) attributes(out[[x]]$classified)), file.path(dir_attr, paste0(image_set_prefix, '.rds')))
 
-  write.csv(area_df, paste0(dir_results, filesep, image_set_prefix, '.csv'), row.names = F)
-  write.csv(results_within_tol, paste0(dir_stab, filesep, image_set_prefix, '.csv'), row.names = F)
+  write.csv(area_df, file.path(dir_results, paste0(image_set_prefix, '.csv')), row.names = F)
+  write.csv(results_within_tol, file.path(dir_stab, paste0(image_set_prefix, '.csv')), row.names = F)
 
   return(results_within_tol)
 
