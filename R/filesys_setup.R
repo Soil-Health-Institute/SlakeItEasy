@@ -35,7 +35,7 @@ set_paths <- function(parent_dir_img = NULL, parent_dir_out = NULL, batch_name =
 
   # select directory containing images
 
-  dir_img <- normalizePath(rstudioapi::selectDirectory(label = 'Look for images here', path = parent_dir_img))
+  dir_img <- rstudioapi::selectDirectory(label = 'Look for images here', path = parent_dir_img)s
 
   # if parent_dir_out is unspecified, interactively select location for creation of new directory containing output files
 
@@ -58,7 +58,7 @@ set_paths <- function(parent_dir_img = NULL, parent_dir_out = NULL, batch_name =
 
   # path to directory for output files
 
-  dir_out <- suppressWarnings(normalizePath(file.path(parent_dir_out, batch_name)))
+  dir_out <- file.path(parent_dir_out, batch_name)
 
   cat('Image directory: ', dir_img, '\nOutput directory: ', dir_out, '\n')
 
