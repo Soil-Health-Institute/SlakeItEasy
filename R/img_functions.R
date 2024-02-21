@@ -188,27 +188,31 @@ set_crop <- function(npts = 2) {
 #'
 rgb_to_binary <- function(img) {
 
-  # average R, G, and B bands
-  img <- (img[,,1] + img[,,2] + img[,,3])/3
+  # if img only has 1 band, return the original img
+  if (length(dim(img)) == 2) {
+    return(img)
+  } else {
+    # average R, G, and B bands
+    img <- (img[,,1] + img[,,2] + img[,,3])/3
 
-  # change color mode to grayscale (required for EBImage::otsu())
-  EBImage::colorMode(img) <- EBImage::Grayscale
+    # change color mode to grayscale (required for EBImage::otsu())
+    EBImage::colorMode(img) <- EBImage::Grayscale
 
-  # estimate soil/background thresholds for each band
-  threshold <- EBImage::otsu(img)
+    # estimate soil/background thresholds for each band
+    threshold <- EBImage::otsu(img)
 
-  # apply threshold to image
-  img_binary <- 1 - (img > threshold)
+    # apply threshold to image
+    img_binary <- 1 - (img > threshold)
 
-  # replace NAs (from mask/crop) with zeroes - otherwise, NAs will be labeled as objects
-  img_binary[is.na(img_binary)] <- 0
+    # replace NAs (from mask/crop) with zeroes - otherwise, NAs will be labeled as objects
+    img_binary[is.na(img_binary)] <- 0
 
-  storage.mode(img_binary) <- 'integer'
+    storage.mode(img_binary) <- 'integer'
 
-  attr(img_binary, 'otsu_threshold') <- threshold
+    attr(img_binary, 'otsu_threshold') <- threshold
 
-  return(img_binary)
-
+    return(img_binary)
+  }
 }
 
 #' Threshold an Image by Normalized Difference between Two Bands

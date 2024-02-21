@@ -25,7 +25,10 @@ Imports:
     stringr
 Suggests: 
     knitr,
-    rmarkdown
+    rmarkdown,
+    future,
+    doFuture,
+    foreach
 VignetteBuilder: 
     knitr
 Encoding: UTF-8
