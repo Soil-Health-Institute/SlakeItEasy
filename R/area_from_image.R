@@ -65,7 +65,7 @@ area_from_image <- function(path_to_rgb, interactive = FALSE, circular_mask = TR
     if (!(w_new %in% dims)) {
 
       resized <- T
-      img_orig <- resize(img_orig, w = w_new, h = h_new)
+      img_orig <- EBImage::resize(img_orig, w = w_new, h = h_new)
 
     }
 
