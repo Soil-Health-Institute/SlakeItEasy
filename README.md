@@ -1,6 +1,6 @@
 # SlakeItEasy: Image-Based Estimation of Soil Aggregate Stability
 
-{SlakeItEasy} provides utility functions to estimate soil aggregate stability via analysis of images of air-dried soil and soil undergoing slaking in water, following [Fajardo et al. (2016)](https://www.sciencedirect.com/science/article/pii/S0167198716300952). Functions are provided to analyze individual images, multiple images per sample, and the output of high-throughput image aquisition schemes (e.g., multiple replicates, multiple samples).
+{SlakeItEasy} provides utility functions to estimate soil aggregate stability via analysis of images of air-dried soil and soil undergoing slaking in water, following [Fajardo et al. (2016)](https://www.sciencedirect.com/science/article/pii/S0167198716300952). Functions are provided to analyze individual images, multiple images per sample, and the output of high-throughput image aquisition schemes (e.g., multiple replicates, multiple samples). See [here](https://soilhealthinstitute.org/app/uploads/2023/02/SOP_AggStability_MultiSample.pdf) for the Soil Health Institute's Standard Operating Procedure for multi-sample image acquisition.
 
 <a href="https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/SIE_sticker.png">
 <img src = "https://raw.githubusercontent.com/Soil-Health-Institute/SlakeItEasy/master/misc/SIE_sticker.png" alt = "SlakeItEasy hexsticker" title = "SlakeItEasy hexsticker" width = "40%" height = "40%" hspace="15" vspace="15" align="right"/></a>
@@ -18,6 +18,12 @@ install.packages('remotes')
 }
 # install latest version of {SlakeItEasy} from GitHub repository
 remotes::install_github('Soil-Health-Institute/SlakeItEasy')
+```
+
+{SlakeItEasy} allows users to analyze batches of images in parallel with the {foreach} package. Run the following lines to install dependencies for parallelization. (Note: users on Mac OSX and Linux can alternatively opt to use the pre-installed {parallel} package.)
+
+```r
+install.packages(c('foreach', 'future', 'doFuture'))
 ```
 
 Note that users on Windows may need to install [Strawberry Perl](https://strawberryperl.com/) before using image metadata extraction utilities from the {exifr} package. After installing Strawberry Perl, complete configuration in `R` as follows:
