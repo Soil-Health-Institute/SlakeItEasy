@@ -1,5 +1,5 @@
 ---
-title: "Example image processing workflow (VIGNETTE UNDER DEVELOPMENT)"
+title: "First steps with SlakeItEasy"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Example image processing workflow}
@@ -7,10 +7,15 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+This vignette outlines a typical workflow using SlakeItEasy to quantify soil aggregate stability from images. See the package [GitHub repository](https://github.com/Soil-Health-Institute/SlakeItEasy/) for instructions on package installation and required file structure and naming conventions. If you want to analyze soils in the field and only need to process one soil sample at a time, check out the Slakes app for Android or iPhone.
+
+A brief note for users without prior R experience: SlakeItEasy is a set of tools (called *functions*) designed to make it easier to quantify the expansion of soils submerged in water. We make a few assumptions about how images were collected and the settings for image processing in the workflow illustrated here and in the default function arguments. To learn more about what each function does and the settings that can be changed, type `?functionname` in the console.
+
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  tidy.opts = list(width.cutoff = 60), tidy = TRUE
 )
 ```
 
@@ -22,51 +27,66 @@ library(dplyr)
 library(SlakeItEasy)
 ```
 
-## Interactively set paths to images and output directory 
+## Set paths to images and output directory
+
+SlakeItEasy is designed to analyze batches of images. We need to tell R where on the computer the image batch is saved and where we want to save files related to image processing and our final aggregate stability data.
+
+The SlakeItEasy package provides the function `set_paths()` for users that prefer to use the file browser to specify locations of images and file output. For output, select a general directory where results for multiple batches can be saved.
 
 ```{r, eval=FALSE}
-paths <- set_paths(parent_dir_img = system.file("images/", package="SlakeItEasy"), batch_name = 'example_output')
+paths <- set_paths()
 ```
 
-(Manually create `paths` list for vignette.)
-```{r}
-paths <- list(image_dir = 'images', batch_name = 'example_output', output_dir = 'tmp/example_output')
+Alternatively, you can specify `paths` non-interactively by defining a named list with the image directory, output directory, and batch name.
+
+```{r, eval=F}
+paths <- list(image_dir = '/path/to/image/directory',
+              output_dir = '/path/to/output/directory',
+              batch_name = 'mybatch')
 ```
 
-## Create directory for output
+```{r, include=FALSE}
+paths <- list(image_dir = system.file("images/", package="SlakeItEasy"),
+              output_dir = tempdir(),
+              batch_name = paste0('batch_', format(Sys.Date(), '%Y%m%d')))
+```
 
-subdirectories for problematic images 
+## Set up directories for output
+
+Create a batch-specific directory for processing outputs. By default, `dir_setup` will also create subdirectories that we will use later to sort images.
 
 ```{r}
+
 dirs_for_flagged_imgs <- dir_setup(paths$output_dir,  return_paths = T)
+
+# extract paths to subdirectories for images that need to be processed interactively and for images that cannot be analyzed (requiring samples be rerun)
+
+reprocess_dir <- dirs_for_flagged_imgs['to_reprocess']
+unusable_dir <- dirs_for_flagged_imgs['unusable']
 ```
 
-## Extract metadata for images 
+## Inspect image metadata
+
+SlakeItEasy extracts image attributes from file names and from EXIF metadata (see `?exifr::read_exif`). As described [here](https://github.com/Soil-Health-Institute/SlakeItEasy/), sample IDs and replicate numbers should be represented by directory names, not image file names. Image file names should contain the date and time of image acquisition. (Note: default function arguments assume images were collected with the OpenCamera Android app.)
 
 ```{r}
 metadata <- get_metadata(paths$image_dir, filename_prefix = 'IMG_')
 ```
 
-## Check for replicates that do not meet expectations for analysis
+Images in the directory specified by `paths$image_dir` are assumed to be arranged by replicate: that is, an individual set of aggregates that were photographed in the air-dry state, immediately after submersion, and after a specified time in water  (by default, ten minutes ±30 seconds). Use `check_replicates` to identify image sets that deviate from these expectations.
 
 ```{r}
 metadata_qaqc <- check_replicates(metadata,  final_img_time_min = 10, final_img_tol_sec = 30, n_images_max = 3)
 
-write.csv(metadata_qaqc$m, paste0(paths$output_dir, '/qaqc_log.csv'), row.names = F)
+# save metadata summary to output directory
+write.csv(metadata_qaqc$m, file.path(paths$output_dir, 'qaqc_log.csv'), row.names = F)
 
 metadata_qaqc$usable
 metadata_qaqc$missing_imgs
 metadata_qaqc$extra_imgs
-metadata_qaqc$multiple_sizes
 metadata_qaqc$wrong_final_time
 
 # metadata[metadata$Directory %in% metadata_qaqc$wrong_final_time,]
-
-# usable with resizing -- to processes these, set match_resolution = T in batch_process
-to_analyze <- metadata_qaqc$multiple_sizes[!metadata_qaqc$multiple_sizes %in% c(metadata_qaqc$missing_imgs, metadata_qaqc$wrong_final_time, metadata_qaqc$extra_imgs)]
-
-# full set of usable images
-to_analyze <- c(metadata_qaqc$usable, to_analyze)
 
 # inspect replicates with extra images
 if (length(metadata_qaqc$extra_imgs) > 0) {
@@ -86,13 +106,13 @@ plot(img_masked)
 test <- area_from_image(with(metadata[1,], paste0(Directory, '/', FileName)), circular_mask = T, d = 0.73, interactive = T)
 ```
 
-## Automated batch processing with a circular crop 
+## Automated batch processing with a circular crop
 
-```{r}
+```{r, eval = F}
 results <- batch_process(dir_vec = to_analyze, outdir = paths$output_dir, filename_prefix = 'IMG_', match_resolution = T, circular_mask = T, parallel = T)
 ```
 
-## Inspect classifications and sort suboptimal images 
+## Inspect classifications and sort suboptimal images
 
 ```{r, eval = F}
 reprocess_dir <- dirs_for_flagged_imgs['to_reprocess']
@@ -100,78 +120,10 @@ unusable_dir <- dirs_for_flagged_imgs['unusable']
 opendirs(c(unusable_dir, reprocess_dir, paste0(paths$output_dir, '/images_false_color')))
 ```
 
-## Prepare for manual processing 
+## Prepare for manual processing
 
 ```{r, eval = F}
 images_to_reprocess <- list.files(reprocess_dir)
 
 dir_vec2 <- unique(sapply(strsplit(images_to_reprocess, '_x_'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')))
 ```
-
-
-## Process images requiring manual crop 
-
-```{r, eval = F}
-results2 <- lapply(dir_vec2, function(i) {
-  print(paste0('Processing ', i, '...'))
-
-  out <- data.frame(image_set = i, stab10 = process_petri(i, interactive = T, match_resolution = T, circular_mask = T, filename_prefix = 'IMG_', outdir = paths$output_dir, aggregates_in_initial = 3))
-  return(out)
-}
-) %>% bind_rows()
-```
-
-## Clean up
-
-```{r, eval = F}
-opendirs(c(unusable_dir, reprocess_dir, paste0(paths$output_dir, '/images_false_color')))
-```
-
-## Get IDs of unusable images
-
-```{r, eval = F}
-unusable <- gsub('.jpg', '', list.files(unusable_dir))
-unusable <- unique(sapply(strsplit(unusable, '_x_'), function(x) paste(x[length(x) - 1])))
-```
-
-## Concatenate automatically & manually processed data 
-
-```{r}
-if (exists('results2')) {
- if (nrow(results2) > 0) {
-  results <- bind_rows(results, results2)
-}
-}
-
-results <- results %>%
-  mutate(replicate_id = sapply(strsplit(image_set, '/'), function(x) x[[length(x)]]),
-         replicate_num = substr(replicate_id, nchar(replicate_id), nchar(replicate_id)),
-         sample_id = sapply(strsplit(replicate_id, '_'), function(x) x[[1]])) 
-
-if (exists('unusable')) {
-results <- results %>%
-  filter(!replicate_id %in% unusable)
-}
-```
-
-## Save results to disk
-
-```{r}
-results %>%
-  write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_results.csv'), row.names = F)
-```
-
-## Summarize results by sample
-
-```{r}
-results %>%
-  group_by(sample_id) %>%
-  summarise(stab10_mg = mean_geom(stab10), stab10_cv = cv(stab10), nreps = n())
-```
-
-
-
-
-
-
-

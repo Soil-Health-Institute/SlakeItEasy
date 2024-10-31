@@ -7,7 +7,6 @@
 #' @param datetime_fmt character string indicating the date and time format used in image file names (see [base::strptime()])
 #' @param final_img_time_min time of final image capture (in minutes) after submersion
 #' @param final_img_tol_sec tolerance for time of final image capture (in seconds)
-#' @param match_resolution
 #' @param safe_sep
 #' @param interactive
 #' @param circular_mask
@@ -16,25 +15,25 @@
 #' @param h_offset
 #' @param v_offset
 #' @param aggregates_in_initial
-#' @param fixed_crop_fraction_initial
-#' @param fixed_crop_fraction_run
-#' @param automask_buffer
-#' @param erode_kern
-#' @param dilate_kern
-#' @param normdiff_min
 #' @param batch_dir
 #'
 #' @return Value of the slaking index at `final_img_time_min` \eqn{\pm} `final_img_tol_sec`
 #' @export
 #'
 #' @examples
-process_petri <- function(path_to_image_set, outdir, filename_prefix, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S', final_img_time_min = 10, final_img_tol_sec = 30, match_resolution = T, safe_sep = '_x_', interactive = F, circular_mask = T, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, aggregates_in_initial = 3, fixed_crop_fraction_initial = NULL, fixed_crop_fraction_run = fixed_crop_fraction_initial, automask_buffer = 0.15, erode_kern = 5, dilate_kern = 31,  normdiff_min = 0, batch_dir = NULL) {
+process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, filename_suffix = NULL, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S', final_img_time_min = 10, final_img_tol_sec = 30, safe_sep = '_x_', interactive = F, circular_mask = T, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, aggregates_in_initial = 3, batch_dir = NULL) {
 
   # # get platform-specific file separator character
   filesep <- .Platform$file.sep
 
-  if (!startsWith(image_extension, '.')) {
+  # prepend period to image file extension, if not provided
+
+  if (substr(image_extension, 1, 1) != '.') {
     image_extension <- paste0('.', image_extension)
+  }
+
+  if (!tolower(image_extension) %in% c('.jpg', '.jpeg', '.png', '.tif', '.tiff')) {
+    stop('Invalid image type. Currently supported formats are JPEG, PNG, and TIFF.', call. = T)
   }
 
   if (!dir.exists(path_to_image_set) & !is.null(batch_dir)) {
@@ -45,7 +44,7 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix, image_exte
 
   image_metadata <- exifr::read_exif(image_paths)
 
-  if (match_resolution) {
+  if (length(unique(image_metadata$Megapixels)) > 1) {
 
     dims_smallest_img <- dplyr::distinct(image_metadata[image_metadata$Megapixels == min(image_metadata$Megapixels),c('ImageHeight', 'ImageWidth')])
 
@@ -58,14 +57,40 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix, image_exte
     h_new <- NULL
   }
 
+  if (is.null(filename_prefix)) {
+    filename_prefix <- ''
+  }
+
+  if (is.null(filename_suffix)) {
+      filename_suffix <- ''
+    }
+
   timestamp_orig <- gsub(image_extension,  "", image_metadata$FileName) %>%
-    gsub(filename_prefix, "", .)
+    gsub(filename_prefix, "", .) %>%
+    gsub(filename_suffix, "", .)
 
   timestamp <- strptime(timestamp_orig, format = datetime_fmt)
 
-  area_airdry <- area_from_image(image_paths[[1]], interactive = interactive, circular_mask = circular_mask, false_color = false_color, d = d, aggregates_in_initial = aggregates_in_initial, fixed_crop_fraction = fixed_crop_fraction_initial, automask_buffer = automask_buffer, erode_kern = erode_kern, dilate_kern = dilate_kern,  h_offset = h_offset, v_offset = v_offset, w_new = w_new, h_new = h_new, normdiff_min = normdiff_min)
+  area_airdry <- area_from_image(image_paths[[1]],
+                                 interactive = interactive,
+                                 circular_mask = circular_mask,
+                                 false_color = false_color,
+                                 d = d,
+                                 aggregates_in_initial = aggregates_in_initial,
+                                 h_offset = h_offset,
+                                 v_offset = v_offset,
+                                 w_new = w_new,
+                                 h_new = h_new)
 
-  area_list <- lapply(2:length(timestamp), function(x) area_from_image(image_paths[[x]], interactive = interactive, circular_mask = circular_mask, false_color = false_color, d = d, fixed_crop_fraction = fixed_crop_fraction_run, automask_buffer = automask_buffer, erode_kern = erode_kern, dilate_kern = dilate_kern, h_offset = h_offset, v_offset = v_offset, w_new = w_new, h_new = h_new, normdiff_min = normdiff_min))
+  area_list <- lapply(2:length(timestamp), function(x) area_from_image(image_paths[[x]],
+                                                                       interactive = interactive,
+                                                                       circular_mask = circular_mask,
+                                                                       false_color = false_color,
+                                                                       d = d,
+                                                                       h_offset = h_offset,
+                                                                       v_offset = v_offset,
+                                                                       w_new = w_new,
+                                                                       h_new = h_new))
 
  if (!is.null(batch_dir)) {
 

@@ -3,16 +3,13 @@
 #' Interactively set paths to directories containing images and directory for
 #' output files.
 #'
-#' @details `set_paths` uses [rstudioapi::selectDirectory()] to facilitate
-#'   interactive selection of input and output directories. If `parent_dir_img`
-#'   is unspecified, the location of the current active project will be used as
-#'   the initial directory for selection of directory containing images.
+#' @details `set_paths` uses [rstudioapi::selectDirectory()] to facilitate interactive selection of input and output directories. If `parent_dir_img` is unspecified, the location of the current active project will be used as the initial directory for selection of directory containing images.
 #'
 #' @param parent_dir_img character string containing relative or absolute path to directory containing subdirectory with images to process
 #' @param parent_dir_out character string containing relative or absolute path to directory where a new subdirectory will be created for output
 #' @param batch_name character string containing name for batch of images to be processed and for associated output directory
 #'
-#' @return A three-element list containing the path to the input image directory, the batch name, and the path to the output directory, as character strings. Relative paths will be returned if relative paths were provided as arguments to `parent_dir_img` and `parent_dir_out`.
+#' @return A three-element list containing the path to the input image directory, the path to the output directory, and the batch name, as character strings. Relative paths will be returned if relative paths were provided as arguments to `parent_dir_img` and `parent_dir_out`.
 #'
 #' @export
 #'
@@ -41,7 +38,8 @@ set_paths <- function(parent_dir_img = NULL, parent_dir_out = NULL, batch_name =
 
   if (is.null(parent_dir_out) | !dir.exists(format(parent_dir_out))) {
 
-    parent_dir_out <- rstudioapi::selectDirectory(label = 'Save output here')
+    parent_dir_out <- rstudioapi::selectDirectory(path =  dir_img,
+                                                   label = 'Save output here')
 
   }
 
@@ -60,10 +58,20 @@ set_paths <- function(parent_dir_img = NULL, parent_dir_out = NULL, batch_name =
 
   dir_out <- file.path(parent_dir_out, batch_name)
 
-  cat('Image directory: ', dir_img, '\nOutput directory: ', dir_out, '\n')
-
-  return(list(image_dir =  dir_img, batch_name = batch_name, output_dir = dir_out))
-
+  if (is.null(dir_img)) {
+    stop('No image directory specified.', call. = F)
+  } else {
+    if (!dir.exists(dir_img)){
+      stop('Image directory does not exist.', call. = F)
+    } else {
+      if (length(dir_out) == 0 | is.null(dir_out)) {
+       stop('No output directory specified.', call. = F)
+      } else {
+      cat('Image directory: ', dir_img, '\nOutput directory: ', dir_out, '\n')
+      return(list(image_dir =  dir_img, output_dir = dir_out, batch_name = batch_name))
+    }
+  }
+  }
 }
 
 #' Silently Create a Directory
@@ -180,7 +188,8 @@ opendirs <- function(dirs){
 #' (metadata <- get_metadata(paths$image_dir, filename_prefix = 'IMG_'))
 #'
 #'
-get_metadata <- function(dir, filename_prefix, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S'){
+
+get_metadata <- function(dir, filename_prefix = NULL, filename_suffix = NULL, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S'){
 
   # prepend period to image file extension, if not provided
 
@@ -188,19 +197,36 @@ get_metadata <- function(dir, filename_prefix, image_extension = 'jpg', datetime
     image_extension <- paste0('.', image_extension)
   }
 
-  if (!tolower(image_extension) %in% c('.jpg', '.png', '.tif', '.tiff')) {
+  if (!tolower(image_extension) %in% c('.jpg', '.jpeg', '.png', '.tif', '.tiff')) {
     stop('Invalid image type. Currently supported formats are JPEG, PNG, and TIFF.', call. = T)
   }
 
   metadat <- exifr::read_exif(list.files(dir, full.names = T, recursive = T, pattern = paste0(image_extension, '$')))
 
+  if (is.null(filename_prefix)) {
+    filename_prefix <- ''
+  }
+
+  if (!all(startsWith(metadat$FileName, filename_prefix))) {
+    stop(paste0('At least one image filename does not begin with the supplied prefix, ', filename_prefix), call. = F)
+  }
+
+  if (is.null(filename_suffix)) {
+    filename_suffix <- ''
+  }
+
   metadat <- metadat %>%
     dplyr::mutate(datetime = gsub(filename_prefix, "", FileName),
+                  datetime = gsub(filename_suffix, "", FileName),
                   datetime = gsub(image_extension, "", datetime),
                   datetime = strptime(datetime, format = datetime_fmt)) %>%
     dplyr::group_by(Directory) %>%
     dplyr::mutate(elapsed_time_m = as.numeric(datetime - min(datetime)) / 60,
-                  slaking_elapsed_time_m = elapsed_time_m - min(elapsed_time_m[elapsed_time_m > 0])) # total elapsed time of measurements and elasped time of slaking, assuming each directory contains only one image prior to submersion
+                  slaking_elapsed_time_m = elapsed_time_m - min(elapsed_time_m[elapsed_time_m > 0])) # total elapsed time of measurements and elapsed time of slaking, assuming each directory contains only one image prior to submersion
+
+  if (anyNA(metadat$datetime)) {
+    stop('Datetime unsuccessfully extracted from filename for one or more images. Verify that you correctly supplied your filename prefix and/or suffix, file extension, and datetime format.', call. = F)
+  }
 
   return(metadat)
 
@@ -235,12 +261,19 @@ get_metadata <- function(dir, filename_prefix, image_extension = 'jpg', datetime
 
 check_replicates <- function(metadata, final_img_time_min = 10, final_img_tol_sec = 30, n_images_min = 3, n_images_max = 3) {
 
+  if (anyNA(metadata$datetime)) {
+    stop('Datetime in metadata data frame invalid for one or more images. Verify that you correctly supplied your filename prefix, file extension, and datetime format when you ran get_metadata().', call. = F)
+  }
+
  m <- metadata  %>%
     dplyr::arrange(Directory, datetime) %>%
     dplyr::mutate(within_final_img_tol = abs(slaking_elapsed_time_m - final_img_time_min) <= final_img_tol_sec/60) %>%
     dplyr::group_by(Directory) %>%
-   dplyr::summarise(n_images = dplyr::n(), n_image_sizes = length(unique(Megapixels)), final_image_within_tol = sum(within_final_img_tol) > 0, initial_and_final_image_size_equal = Megapixels[elapsed_time_m == min(elapsed_time_m)] == dplyr::first(Megapixels[within_final_img_tol]))  %>%
-   dplyr::mutate(qaqc_pass = n_images >= n_images_min & n_images <= n_images_max & n_image_sizes == 1 & final_image_within_tol > 0) %>%
+   dplyr::summarise(n_images = dplyr::n(), # number of images per directory
+                    final_image_within_tol = sum(within_final_img_tol) > 0) %>% # timing of final image within tolerance)
+   dplyr::mutate(qaqc_pass = n_images >= n_images_min &
+                   n_images <= n_images_max  &
+                   final_image_within_tol > 0) %>%
    dplyr::arrange(qaqc_pass)
 
  # report:
@@ -248,12 +281,8 @@ check_replicates <- function(metadata, final_img_time_min = 10, final_img_tol_se
  missing_imgs <- sum(m$n_images < n_images_min, na.rm = T)
  # number of replicates with greater than the expected number of images
  extra_imgs <- sum(m$n_images > n_images_max, na.rm = T)
- # number of replicates with multiple image sizes
- multiple_sizes <- sum(m$n_image_sizes > 1, na.rm = T)
  # number of replicates with no final image (within tolerance)
  wrong_final_time <- sum(m$final_image_within_tol == 0, na.rm = T)
- # number of image sizes across replicates
- n_sizes_batch <- length(unique(metadata$Megapixels))
  # number of replicates with no issues
  n_usable <- sum(m$qaqc_pass)
 
@@ -263,17 +292,12 @@ check_replicates <- function(metadata, final_img_time_min = 10, final_img_tol_se
 
  if (missing_imgs > 0) {
    warning(paste(missing_imgs, ' replicates do not have all images.'))
-   out[['missing_imgs']] <- m$Directory[m$n_images < 3]
+   out[['missing_imgs']] <- m$Directory[m$n_images < n_images_min]
  }
 
  if (extra_imgs > 0) {
    warning(paste(extra_imgs, ' replicates have more images than expected.'))
-   out[['extra_imgs']] <- m$Directory[m$n_images > 3]
- }
-
- if (multiple_sizes > 0) {
-   warning(paste(multiple_sizes, ' replicates have inconsistent image resolution.'))
-   out[['multiple_sizes']] <- m$Directory[m$n_image_sizes > 1]
+   out[['extra_imgs']] <- m$Directory[m$n_images > n_images_max]
  }
 
  if (wrong_final_time > 0) {
@@ -281,12 +305,9 @@ check_replicates <- function(metadata, final_img_time_min = 10, final_img_tol_se
    out[['wrong_final_time']] <- m$Directory[m$final_image_within_tol == 0]
  }
 
- if (n_sizes_batch > 1) {
-   warning(paste(n_sizes_batch, ' distinct image resolutions detected in batch.'))
- }
-
  cat(n_usable, '/', nrow(m), ' replicates pass QA/QC.\n')
 
  return(out)
+
 }
 

@@ -9,7 +9,10 @@
 #' @export
 #'
 #' @examples
-batch_process <- function(dir_vec, parallel = F, ncores = parallel::detectCores() - 1, return_output = T, ...) {
+batch_process <- function(dir_vec,
+                          parallel = F,
+                          ncores = parallel::detectCores() - 1,
+                          return_output = T, ...) {
 
    if (parallel) {
        if (requireNamespace('foreach', quietly = TRUE)) {
