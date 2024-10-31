@@ -9,7 +9,6 @@
 #' @param final_img_tol_sec tolerance for time of final image capture (in seconds)
 #' @param safe_sep
 #' @param interactive
-#' @param circular_mask
 #' @param false_color
 #' @param d
 #' @param h_offset
@@ -21,7 +20,7 @@
 #' @export
 #'
 #' @examples
-process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, filename_suffix = NULL, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S', final_img_time_min = 10, final_img_tol_sec = 30, safe_sep = '_x_', interactive = F, circular_mask = T, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, aggregates_in_initial = 3, batch_dir = NULL) {
+process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, filename_suffix = NULL, image_extension = 'jpg', datetime_fmt = '%Y%m%d_%H%M%S', final_img_time_min = 10, final_img_tol_sec = 30, safe_sep = '_x_', interactive = F, false_color = 'red', d = 0.7, h_offset = 0, v_offset = 0, aggregates_in_initial = 3, batch_dir = NULL) {
 
   # # get platform-specific file separator character
   filesep <- .Platform$file.sep
@@ -73,7 +72,6 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, fil
 
   area_airdry <- area_from_image(image_paths[[1]],
                                  interactive = interactive,
-                                 circular_mask = circular_mask,
                                  false_color = false_color,
                                  d = d,
                                  aggregates_in_initial = aggregates_in_initial,
@@ -84,7 +82,6 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, fil
 
   area_list <- lapply(2:length(timestamp), function(x) area_from_image(image_paths[[x]],
                                                                        interactive = interactive,
-                                                                       circular_mask = circular_mask,
                                                                        false_color = false_color,
                                                                        d = d,
                                                                        h_offset = h_offset,
