@@ -217,7 +217,7 @@ get_metadata <- function(dir, filename_prefix = NULL, filename_suffix = NULL, im
 
   metadat <- metadat %>%
     dplyr::mutate(datetime = gsub(filename_prefix, "", FileName),
-                  datetime = gsub(filename_suffix, "", FileName),
+                  datetime = gsub(filename_suffix, "", datetime),
                   datetime = gsub(image_extension, "", datetime),
                   datetime = strptime(datetime, format = datetime_fmt)) %>%
     dplyr::group_by(Directory) %>%
