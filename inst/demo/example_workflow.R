@@ -2,68 +2,69 @@ library(EBImage)
 library(dplyr)
 library(SlakeItEasy)
 
+# NOTE: TYPE CONTROL + SHIFT + o (COMMAND + SHIFT + o) TO TOGGLE WORKFLOW OUTLINE
+
 # set paths to images and output directory --------------------------------
+### run the following line to select the location of your images and output interactively. if you routinely process images in a consistent location, specify that location as the parent_dir_img argument to set_paths(), e.g.,
+# paths <- set_paths(parent_dir_img = '~/Library/CloudStorage/OneDrive-SharedLibraries-SoilHealthInstitute/Data Repository - Documents/Final Data File Store/AmAgLab Slakes/')
+
 paths <- set_paths(parent_dir_img = system.file("images/", package="SlakeItEasy"), batch_name = 'demo')
+
+# alternatively, create paths object non-interactively:
+# paths <- list(image_dir = '/path/to/image/directory',
+#               output_dir = '/path/to/output/directory',
+#               batch_name = 'mybatch')
 
 # create directory for output and for problematic images ------------------
 dirs_for_flagged_imgs <- dir_setup(paths$output_dir,  return_paths = T)
 
+reprocess_dir <- dirs_for_flagged_imgs['to_reprocess']
+unusable_dir <- dirs_for_flagged_imgs['unusable']
+
+###
+
+# if you want to concatenate the output of a previous run, skip to the section "concatenate previous run"
+
+####
+
 # extract metadata for images ---------------------------------------------
-metadata <- get_metadata(paths$image_dir, filename_prefix = 'IMG_')
+metadata <- get_metadata(paths$image_dir, filename_prefix = 'IMG_', image_extension = '.jpg')
 
 # check for replicates that do not meet expectations for analysis ---------
 metadata_qaqc <- check_replicates(metadata, final_img_time_min = 10, final_img_tol_sec = 30, n_images_max = 3)
 
-write.csv(metadata_qaqc$m, paste0(paths$output_dir, '/qaqc_log.csv'), row.names = F)
-
-metadata_qaqc$usable
-metadata_qaqc$missing_imgs
-metadata_qaqc$extra_imgs
-metadata_qaqc$multiple_sizes
 metadata_qaqc$wrong_final_time
 
-# check time of final image for samples missing an image within tolerance
-metadata[metadata$Directory %in% metadata_qaqc$wrong_final_time,] %>%
-  dplyr::select(slaking_elapsed_time_m)
+write.csv(metadata_qaqc$m, paste0(paths$output_dir, '/qaqc_log.csv'), row.names = F)
 
-# usable with resizing -- to processes these, set match_resolution = T in batch_process
-to_analyze <- metadata_qaqc$multiple_sizes[!metadata_qaqc$multiple_sizes %in% c(metadata_qaqc$missing_imgs, metadata_qaqc$wrong_final_time, metadata_qaqc$extra_imgs)]
+# usable images
 
-# full set of usable images
-to_analyze <- c(metadata_qaqc$usable, to_analyze)
+to_analyze <- metadata_qaqc$usable
 
-# inspect replicates with extra images
+to_analyze  <- to_analyze[!is.na(to_analyze)]
+
+# inspect replicates with extra images and/or missing images. if you reorganize files, rerun this script starting from "metadata <- get_metadata(...)"
+
 if (length(metadata_qaqc$extra_imgs) > 0) {
   opendirs(metadata_qaqc$extra_imgs)
 }
 
-# inspect replicates missing images
 if (length(metadata_qaqc$missing_imgs) > 0) {
   opendirs(metadata_qaqc$missing_imgs)
 }
 
-# # single-image functionality --------------------------------------
-# img <- read_to_portrait(with(metadata[2,], paste0(Directory, '/', FileName)))
-# img_masked <- mask_image_circular(img, interactive = T, v_offset = -0.1, d = 0.73)
-# plot(img_masked)
-#
-# test <- area_from_image(with(metadata[1,], paste0(Directory, '/', FileName)), circular_mask = T, d = 0.73, interactive = T)
-
 # automated batch processing with a circular crop -------------------------
+# see ?process_petri and ?area_from_image for descriptions of function parameters
+
 results <- batch_process(dir_vec = to_analyze,
                          outdir = paths$output_dir,
                          filename_prefix = 'IMG_',
-                         match_resolution = !is.null(metadata_qaqc$multiple_sizes),
-                         circular_mask = T,
                          parallel = T,
                          d = 0.72,
-                         v_offset = 0.02,
                          batch_dir = paths$image_dir,
                          false_color = 'green')
 
 # inspect classifications and sort suboptimal images ----------------------
-reprocess_dir <- dirs_for_flagged_imgs['to_reprocess']
-unusable_dir <- dirs_for_flagged_imgs['unusable']
 
 opendirs(c(unusable_dir, reprocess_dir, paste0(paths$output_dir, '/images_false_color')))
 
@@ -72,52 +73,60 @@ images_to_reprocess <- list.files(reprocess_dir)
 
 replicates_to_reprocess <- unique(sapply(strsplit(images_to_reprocess, '_x_'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')))
 
-# replicates_to_reprocess <- paste0(paths$image_dir, '/', replicates_to_reprocess)
-
 # process images requiring manual crop ------------------------------------
 results2 <- lapply(replicates_to_reprocess, function(i) {
   print(paste0('Processing ', i, '...'))
 
-  out <- process_petri(i, interactive = T, match_resolution = !is.null(metadata_qaqc$multiple_sizes), circular_mask = T, filename_prefix = 'IMG_', outdir = paths$output_dir, aggregates_in_initial = 3, batch_dir = paths$image_dir, false_color = 'green')
+  out <- process_petri(i, interactive = T, filename_prefix = 'IMG_', outdir = paths$output_dir, aggregates_in_initial = 3, batch_dir = paths$image_dir, false_color = 'green')
 
   return(out)
 }
-) %>% bind_rows()
+) %>%
+  bind_rows()
 
 # sort/clean up -----------------------------------------------------------
+# if all images were manually reprocessed successfully, you can delete them from the "to_reprocess" folder. If you want to reprocess images again, run the code again starting from "images_to_reprocess <- list.files(reprocess_dir)"
 
 opendirs(c(unusable_dir, reprocess_dir, paste0(paths$output_dir, '/images_false_color')))
 
 # get IDs of unusable images -----------------------------------------------------
 
 unusable <- gsub('.jpg', '', list.files(unusable_dir))
-
-# unusable <- unique(sapply(strsplit(unusable, '_x_'), function(x) paste0(x[1], x[length(x) - 1])))
-
 unusable <- unique(sapply(strsplit(unusable, '_x_'), function(x) paste(x[length(x) - 1])))
 
 # concatenate automatically & manually processed data ---------------------
 
-if (nrow(results2) > 0) {
-
-  results <- results %>%
-
-    filter(!image_set %in% replicates_to_reprocess)
-
-  results <- bind_rows(results, results2)
+if (exists('results2')) {
+  if (nrow(results2) > 0) {
+    results <- bind_rows(results,
+                         results2)
+  }
 }
+
+
+# parse sample/replicate IDs ----------------------------------------------
+
+
+# NOTE: THE FOLLOWING CODE EXTRACTS SAMPLE IDS AND REPLICATE INFORMATION. IF YOU GET UNEXPECTED RESULTS, IT MAY BE BECAUSE FILE STRUCTURE/IMAGE NAMING DEVIATE FROM THE EXPECTED CONVENTIONS, AND YOU MAY NEED TO MODIFY THIS SECTION.
 
 results <- results %>%
   mutate(parent_dir = sapply(strsplit(image_set, '/'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')),
          replicate_id = sapply(strsplit(image_set, '/'), function(x) x[[length(x)]]),
          replicate_num = substr(replicate_id, nchar(replicate_id), nchar(replicate_id)),
-         sample_id = substr(replicate_id, 1, nchar(replicate_id) - 2)) %>% ### inspect results$replicate_id and change nchar(replicate_id) - 2 to extract full sample ID
+         # sample_id = substr(replicate_id, 1, 12), # uncomment this line and delete the following line if sample IDs are a fixed number of digits (e.g., here, 12)
+         sample_id = sapply(strsplit(replicate_id, '_'), function(x) x[[1]]) # extract sample ID, assuming sample ID is separated from replicate number/letter by an underscore
+  ) %>%
   filter(!replicate_id %in% unusable)
 
-# concatenate results (when in new session) -------------------------------
+# concatenate previous run -----------------------------------------------
+
 if (!exists('results')) {
 
   path_to_results <- list.files(paste0(paths$output_dir, '/stability_index'), full.names = T, pattern = '.csv$')
+
+  unusable_dir <-
+    unusable <- gsub('.jpg', '', list.files(unusable_dir))
+  unusable <- unique(sapply(strsplit(unusable, '_x_'), function(x) paste(x[length(x) - 1])))
 
   results <- do.call(rbind, lapply(path_to_results, read.csv))
 
@@ -125,8 +134,14 @@ if (!exists('results')) {
     mutate(parent_dir = sapply(strsplit(image_set, '/'), function(x) paste(x[1:(length(x) - 1)], collapse = '/')),
            replicate_id = sapply(strsplit(image_set, '/'), function(x) x[[length(x)]]),
            replicate_num = substr(replicate_id, nchar(replicate_id), nchar(replicate_id)),
-           sample_id = substr(replicate_id, 1, nchar(replicate_id) - 2)) %>% ### inspect results$replicate_id and change nchar(replicate_id) - 2 to extract full sample ID
+           sample_id = sapply(strsplit(replicate_id, '_'), function(x) x[[1]])) %>%
     filter(!replicate_id %in% unusable)
+
+  # safeguard to drop results of automatic processing when interactively processed results exist
+
+  results <- results %>%
+    group_by(sample_id, replicate_num) %>%
+    filter(n() == 1 | interactively_processed == T)
 
 }
 
@@ -135,9 +150,10 @@ if (!exists('results')) {
 results %>%
   write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_results.csv'), row.names = F)
 
+
 # summarize results by sample ---------------------------------------------
 
 results %>%
-  group_by(sample_id) %>%
+  group_by(parent_dir, sample_id) %>%
   summarise(stab_gmean = mean_geom(stab), stab_cv = cv(stab), nreps = n()) %>%
   write.csv(paste0(paths$output_dir, '/', paths$batch_name, '_stab10_means.csv'), row.names = F)
