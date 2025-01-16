@@ -35,13 +35,23 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, fil
     stop('Invalid image type. Currently supported formats are JPEG, PNG, and TIFF.', call. = T)
   }
 
-  if (!dir.exists(path_to_image_set) & !is.null(batch_dir)) {
+  if (!dir.exists(path_to_image_set) & !is.null(batch_dir) & !grepl('/', path_to_image_set, fixed = T)) {
     path_to_image_set <- file.path(batch_dir, path_to_image_set)
+  }
+
+  if (!dir.exists(path_to_image_set)) {
+    stop(paste0('Directory ', path_to_image_set, ' does not exist. Double-check path_to_image_set and/or batch_dir arguments.'), call. = T)
   }
 
   image_paths <- list.files(path_to_image_set, full.names = T, pattern = paste0(image_extension, '$'))
 
   image_metadata <- exifr::read_exif(image_paths)
+
+  if (!'ImageHeight' %in% names(image_metadata) |
+      !'ImageWidth' %in% names(image_metadata) |
+      !'Megapixels' %in% names(image_metadata)) {
+    stop('EXIF image metadata missing expected fields. Inspect metadata for a single image using exifr::read_exif("path/to/your/image").', call. = T)
+  }
 
   if (length(unique(image_metadata$Megapixels)) > 1) {
 
@@ -89,17 +99,9 @@ process_petri <- function(path_to_image_set, outdir, filename_prefix = NULL, fil
                                                                        w_new = w_new,
                                                                        h_new = h_new))
 
- if (!is.null(batch_dir)) {
-
-   if (!endsWith(batch_dir, '/')) {
-     batch_dir  <- paste0(batch_dir, '/')
-   }
-
-    path_to_image_set <- gsub(batch_dir, '', path_to_image_set)
-
-    # batch <- gsub("^.*/", "", batch_dir)
-
-  }
+path_to_image_set <- strsplit(path_to_image_set, '/') %>%
+  .[[1]] %>%
+  .[length(.)]
 
   area_df <- data.frame(image_set = path_to_image_set,
                         FileName = image_metadata$FileName,
