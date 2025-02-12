@@ -145,6 +145,36 @@ if (!exists('results')) {
 
 }
 
+
+# results in wide format (one column per replicate for stab0 and stab10) --------
+
+area_by_time <- lapply(list.files(file.path(paths$output_dir, 'area_by_time'), pattern = '.csv', full.names = T), read.csv) %>%
+  do.call(rbind, .)
+
+stab_wide <- area_by_time %>%
+      filter(stab != 1) %>%
+      mutate(measurement_type =
+               paste0('stab', round(duration_of_slaking)),
+             # lab_id = gsub('images_from_lab/', '', image_set, fixed = T),
+             lab_id = str_split_i(image_set, '/', -1),
+             lab_id = stringr::str_split_i(lab_id, '_', 1),
+             rep_num = substr(image_set, nchar(image_set), nchar(image_set)),
+             rep_num = case_when(toupper(rep_num) %in% c('A', '1') ~ 'a',
+                                 toupper(rep_num) %in% c('B', '2') ~ 'b',
+                                 toupper(rep_num) %in% c('C', '3') ~ 'c',
+                                 TRUE ~ rep_num)) %>%
+      pivot_wider(id_cols = lab_id,
+                  names_from = c(measurement_type, rep_num),
+                  values_from = stab,
+                  names_vary = 'fastest')
+
+# save wide-format data to disk
+
+stab_wide %>%
+  dplyr::select(lab_id, contains('stab')) %>%
+  write.csv(file.path(paths$output_dir, paste0(paths$batch_name, '_slakes_wide.csv')), row.names = F)
+
+
 # save results to disk ----------------------------------------------------
 
 results %>%
